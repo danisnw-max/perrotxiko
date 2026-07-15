@@ -1,0 +1,25 @@
+# Virtual environments
+backend/.venv/
+backend/.env
+backend/__pycache__/
+*.pyc
+
+# Local databases
+backend/database.db
+backend/test_database.db
+backend/backups/
+backend/uploads/justificantes/
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

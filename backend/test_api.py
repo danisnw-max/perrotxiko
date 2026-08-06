@@ -47,17 +47,16 @@ def test_database_creation_and_seeding():
         hb = HorarioBar(
             dia_semana=0, 
             abierto=True, 
-            apertura_manana="09:00", 
-            cierre_manana="16:00",
-            apertura_tarde="19:00",
-            cierre_tarde="00:00"
+            hora_apertura="09:00", 
+            hora_cierre="00:00"
         )
         session.add(hb)
         session.commit()
         
         session.refresh(hb)
         db_hb = session.get(HorarioBar, hb.id)
-        assert db_hb.apertura_manana == "09:00"
+        assert db_hb.hora_apertura == "09:00"
+        assert db_hb.hora_cierre == "00:00"
         print("[Test] Opening Hours model verified!")
 
         # Test worked hours calculations

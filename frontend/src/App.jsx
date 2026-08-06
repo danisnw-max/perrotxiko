@@ -77,7 +77,7 @@ export default function App() {
   const [editingStoreHours, setEditingStoreHours] = useState([]);
   const [barHoursForm, setBarHoursForm] = useState({
     id: null, dia_semana: 0, desde: '', hasta: '', abierto: true,
-    apertura_manana: '09:00', cierre_manana: '16:00', apertura_tarde: '19:00', cierre_tarde: '00:00'
+    hora_apertura: '09:00', hora_cierre: '00:00'
   });
   const [barHoursType, setBarHoursType] = useState('always');
 
@@ -438,16 +438,14 @@ export default function App() {
         ...barHoursForm,
         desde: barHoursType === 'seasonal' ? barHoursForm.desde : null,
         hasta: barHoursType === 'seasonal' ? barHoursForm.hasta : null,
-        apertura_manana: barHoursForm.abierto ? barHoursForm.apertura_manana : null,
-        cierre_manana: barHoursForm.abierto ? barHoursForm.cierre_manana : null,
-        apertura_tarde: barHoursForm.abierto ? barHoursForm.apertura_tarde : null,
-        cierre_tarde: barHoursForm.abierto ? barHoursForm.cierre_tarde : null
+        hora_apertura: barHoursForm.abierto ? barHoursForm.hora_apertura : null,
+        hora_cierre: barHoursForm.abierto ? barHoursForm.hora_cierre : null
       };
       await api.post('/configuracion/horario-bar', payload);
       showToast("Horario comercial guardado", "success");
       setBarHoursForm({
         id: null, dia_semana: 0, desde: '', hasta: '', abierto: true,
-        apertura_manana: '09:00', cierre_manana: '16:00', apertura_tarde: '19:00', cierre_tarde: '00:00'
+        hora_apertura: '09:00', hora_cierre: '00:00'
       });
       loadConfig();
     } catch (err) {
@@ -1398,8 +1396,7 @@ export default function App() {
                         <p className="text-slate-400 mt-1 font-bold">
                           {bh.abierto ? (
                             <span>
-                              {bh.apertura_manana}-{bh.cierre_manana}
-                              {bh.apertura_tarde && ` / ${bh.apertura_tarde}-${bh.cierre_tarde}`}
+                              {bh.hora_apertura} - {bh.hora_cierre}
                             </span>
                           ) : (
                             <span className="text-rose-400 font-bold">Cerrado</span>
@@ -1433,7 +1430,7 @@ export default function App() {
                   {barHoursForm.id && (
                     <button 
                       type="button" 
-                      onClick={() => setBarHoursForm({ id: null, dia_semana: 0, desde: '', hasta: '', abierto: true, apertura_manana: '09:00', cierre_manana: '16:00', apertura_tarde: '19:00', cierre_tarde: '00:00' })}
+                      onClick={() => setBarHoursForm({ id: null, dia_semana: 0, desde: '', hasta: '', abierto: true, hora_apertura: '09:00', hora_cierre: '00:00' })}
                       className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:underline cursor-pointer"
                     >
                       Limpiar / Nuevo
@@ -1515,26 +1512,15 @@ export default function App() {
                 </div>
 
                 {barHoursForm.abierto && (
-                  <div className="space-y-3 p-3.5 bg-slate-950/40 rounded-xl border border-slate-855 animate-in slide-in-from-top-2 duration-200">
+                  <div className="space-y-3 p-3.5 bg-slate-950/40 rounded-xl border border-slate-800 animate-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-400">
                       <div>
-                        <label className="block text-[8px] font-black uppercase mb-1">Apertura Mañana</label>
-                        <input type="time" value={barHoursForm.apertura_manana || ''} onChange={e => setBarHoursForm({...barHoursForm, apertura_manana: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
+                        <label className="block text-[8px] font-black uppercase mb-1">Hora de Apertura</label>
+                        <input type="time" value={barHoursForm.hora_apertura || ''} onChange={e => setBarHoursForm({...barHoursForm, hora_apertura: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
                       </div>
                       <div>
-                        <label className="block text-[8px] font-black uppercase mb-1">Cierre Mañana</label>
-                        <input type="time" value={barHoursForm.cierre_manana || ''} onChange={e => setBarHoursForm({...barHoursForm, cierre_manana: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-400">
-                      <div>
-                        <label className="block text-[8px] font-black uppercase mb-1">Apertura Tarde/Noche</label>
-                        <input type="time" value={barHoursForm.apertura_tarde || ''} onChange={e => setBarHoursForm({...barHoursForm, apertura_tarde: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
-                      </div>
-                      <div>
-                        <label className="block text-[8px] font-black uppercase mb-1">Cierre Tarde/Noche</label>
-                        <input type="time" value={barHoursForm.cierre_tarde || ''} onChange={e => setBarHoursForm({...barHoursForm, cierre_tarde: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
+                        <label className="block text-[8px] font-black uppercase mb-1">Hora de Cierre</label>
+                        <input type="time" value={barHoursForm.hora_cierre || ''} onChange={e => setBarHoursForm({...barHoursForm, hora_cierre: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
                       </div>
                     </div>
                   </div>

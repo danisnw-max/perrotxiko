@@ -34,10 +34,8 @@ def save_horario_bar(hb: HorarioBar, session: Session = Depends(get_session)):
             db_hb.desde = hb.desde
             db_hb.hasta = hb.hasta
             db_hb.abierto = hb.abierto
-            db_hb.apertura_manana = hb.apertura_manana
-            db_hb.cierre_manana = hb.cierre_manana
-            db_hb.apertura_tarde = hb.apertura_tarde
-            db_hb.cierre_tarde = hb.cierre_tarde
+            db_hb.hora_apertura = hb.hora_apertura
+            db_hb.hora_cierre = hb.hora_cierre
             session.add(db_hb)
             session.commit()
             session.refresh(db_hb)

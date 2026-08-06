@@ -71,10 +71,8 @@ class HorarioBarBase(BaseModel):
     desde: Optional[str] = None
     hasta: Optional[str] = None
     abierto: bool = True
-    apertura_manana: Optional[str] = None
-    cierre_manana: Optional[str] = None
-    apertura_tarde: Optional[str] = None
-    cierre_tarde: Optional[str] = None
+    hora_apertura: Optional[str] = None
+    hora_cierre: Optional[str] = None
 
 class HorarioBarCreate(HorarioBarBase):
     pass

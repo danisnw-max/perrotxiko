@@ -679,26 +679,54 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         else:
             day_coberturas = [c for c in coberturas_list if c.dia_semana == weekday and (c.fecha is None or c.fecha == "")]
         
+        # Determine commercial hours and split shifts
+        m_start, m_end, t_start, t_end = None, None, None, None
+        if bh.abierto and bh.hora_apertura and bh.hora_cierre:
+            def get_time_val(t_str: str) -> float:
+                try:
+                    parts = t_str.split(":")
+                    return int(parts[0]) + int(parts[1]) / 60.0
+                except Exception:
+                    return 0.0
+            
+            ap_val = get_time_val(bh.hora_apertura)
+            ci_val = get_time_val(bh.hora_cierre)
+            if ci_val < ap_val:
+                ci_val += 24.0
+            duration = ci_val - ap_val
+            
+            m_start = bh.hora_apertura
+            if duration <= 9.0:
+                m_end = bh.hora_cierre
+            else:
+                split_val = 16.0
+                if ap_val >= split_val:
+                    split_val = ap_val + (duration / 2.0)
+                
+                split_hour = int(split_val)
+                split_min = int((split_val - split_hour) * 60)
+                m_end = f"{split_hour % 24:02d}:{split_min:02d}"
+                t_start = m_end
+                t_end = bh.hora_cierre
+
         slots = []
         # Fallback default coverages if none configured in DB
         if not day_coberturas:
-            # Morning: 1 Cocinero, 1 Sala. Afternoon/Evening: 1 Cocinero, 2 Sala
-            if bh.apertura_manana and bh.cierre_manana:
-                slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, "Cocinero", 0, None))
-                slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, "Sala", 0, None))
-            if bh.apertura_tarde and bh.cierre_tarde:
-                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Cocinero", 0, None))
-                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Sala", 0, None))
-                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Sala", 1, None))
+            if m_start and m_end:
+                slots.append(("Mañana", m_start, m_end, "Cocinero", 0, None))
+                slots.append(("Mañana", m_start, m_end, "Sala", 0, None))
+            if t_start and t_end:
+                slots.append(("Tarde", t_start, t_end, "Cocinero", 0, None))
+                slots.append(("Tarde", t_start, t_end, "Sala", 0, None))
+                slots.append(("Tarde", t_start, t_end, "Sala", 1, None))
         else:
             for cob in day_coberturas:
-                # Map shift name to time slots
-                if cob.turno == "Mañana" and bh.apertura_manana and bh.cierre_manana:
+                if cob.turno == "Mañana" and m_start and m_end:
                     for idx in range(cob.cantidad):
-                        slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, cob.puesto, idx, cob.descripcion))
-                elif cob.turno in ["Tarde", "Noche"] and bh.apertura_tarde and bh.cierre_tarde:
+                        slots.append(("Mañana", m_start, m_end, cob.puesto, idx, cob.descripcion))
+                elif cob.turno in ["Tarde", "Noche"] and t_start and t_end:
                     for idx in range(cob.cantidad):
-                        slots.append((cob.turno, bh.apertura_tarde, bh.cierre_tarde, cob.puesto, idx, cob.descripcion))
+                        slots.append((cob.turno, t_start, t_end, cob.puesto, idx, cob.descripcion))
         
         if not slots:
             continue

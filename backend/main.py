@@ -56,33 +56,26 @@ def seed_database(session: Session):
         session.commit()
         print("Default employees seeded!")
 
-    # 3. Seed HorarioBar (Commercial hours for a bar, usually 08:00 - 01:00, or split shifts)
+    # 3. Seed HorarioBar (Commercial hours for a bar)
     if session.exec(select(HorarioBar)).first() is None:
         for i in range(7):
-            # Mon-Thu: 09:00 - 16:00, 19:00 - 00:00
-            # Fri-Sat: 09:00 - 16:00, 18:00 - 02:00
-            # Sun: 09:00 - 17:00 (Cerrado por la tarde)
+            # Mon-Thu: 09:00 - 00:00
+            # Fri-Sat: 09:00 - 02:00
+            # Sun: 09:00 - 17:00
             abierto = True
-            ap_m = "09:00"
-            ci_m = "16:00"
+            ap = "09:00"
             if i < 4:  # Lun-Jue
-                ap_t = "19:00"
-                ci_t = "00:00"
-            elif i < 6:  # Vie-Sab
-                ap_t = "18:00"
-                ci_t = "02:00"
+                ci = "00:00"
+            elif i < 6:  # Vie-Sáb
+                ci = "02:00"
             else:  # Dom
-                ap_t = None
-                ci_t = None
-                ci_m = "17:00"
+                ci = "17:00"
                 
             session.add(HorarioBar(
                 dia_semana=i,
                 abierto=abierto,
-                apertura_manana=ap_m,
-                cierre_manana=ci_m,
-                apertura_tarde=ap_t,
-                cierre_tarde=ci_t
+                hora_apertura=ap,
+                hora_cierre=ci
             ))
         session.commit()
         print("HorarioBar seeded!")

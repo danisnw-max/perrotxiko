@@ -91,10 +91,8 @@ class HorarioBar(SQLModel, table=True):
     desde: Optional[str] = Field(default=None, index=True)  # YYYY-MM-DD
     hasta: Optional[str] = Field(default=None, index=True)  # YYYY-MM-DD
     abierto: bool = Field(default=True)
-    apertura_manana: Optional[str] = None  # HH:MM
-    cierre_manana: Optional[str] = None  # HH:MM
-    apertura_tarde: Optional[str] = None   # Turno de tarde/noche
-    cierre_tarde: Optional[str] = None
+    hora_apertura: Optional[str] = None  # HH:MM
+    hora_cierre: Optional[str] = None  # HH:MM
 
 class CoberturaRequerida(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

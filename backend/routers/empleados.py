@@ -464,7 +464,6 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
     
     # Get Bar hours
     bar_hours_list = session.exec(select(HorarioBar)).all()
-    bar_hours_by_weekday = {bh.dia_semana: bh for bh in bar_hours_list}
     
     # Get Coverage rules
     coberturas_list = session.exec(select(CoberturaRequerida)).all()
@@ -656,7 +655,20 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
             continue
 
         weekday = curr_date.weekday()  # 0=Monday, 6=Sunday
-        bh = bar_hours_by_weekday.get(weekday)
+        
+        # Resolve bar opening hours for this day (seasonal rules override defaults)
+        bh = None
+        for rule in bar_hours_list:
+            if rule.dia_semana == weekday and rule.desde and rule.hasta:
+                if rule.desde <= date_str <= rule.hasta:
+                    bh = rule
+                    break
+        if not bh:
+            for rule in bar_hours_list:
+                if rule.dia_semana == weekday and (not rule.desde) and (not rule.hasta):
+                    bh = rule
+                    break
+                    
         if not bh or not bh.abierto:
             continue
             

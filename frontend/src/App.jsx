@@ -75,6 +75,11 @@ export default function App() {
   // Bar Hours Modal
   const [isStoreHoursModalOpen, setIsStoreHoursModalOpen] = useState(false);
   const [editingStoreHours, setEditingStoreHours] = useState([]);
+  const [barHoursForm, setBarHoursForm] = useState({
+    id: null, dia_semana: 0, desde: '', hasta: '', abierto: true,
+    apertura_manana: '09:00', cierre_manana: '16:00', apertura_tarde: '19:00', cierre_tarde: '00:00'
+  });
+  const [barHoursType, setBarHoursType] = useState('always');
 
   // Role Coverages Modal
   const [isRefuerzosModalOpen, setIsRefuerzosModalOpen] = useState(false);
@@ -426,16 +431,38 @@ export default function App() {
   };
 
   // Save Bar Hours configuration
-  const handleSaveStoreHours = async () => {
+  const handleSaveStoreHours = async (e) => {
+    e.preventDefault();
     try {
-      for (const bh of editingStoreHours) {
-        await api.post('/configuracion/horario-bar', bh);
-      }
-      showToast("Horarios comerciales del bar actualizados", "success");
-      setIsStoreHoursModalOpen(false);
+      const payload = {
+        ...barHoursForm,
+        desde: barHoursType === 'seasonal' ? barHoursForm.desde : null,
+        hasta: barHoursType === 'seasonal' ? barHoursForm.hasta : null,
+        apertura_manana: barHoursForm.abierto ? barHoursForm.apertura_manana : null,
+        cierre_manana: barHoursForm.abierto ? barHoursForm.cierre_manana : null,
+        apertura_tarde: barHoursForm.abierto ? barHoursForm.apertura_tarde : null,
+        cierre_tarde: barHoursForm.abierto ? barHoursForm.cierre_tarde : null
+      };
+      await api.post('/configuracion/horario-bar', payload);
+      showToast("Horario comercial guardado", "success");
+      setBarHoursForm({
+        id: null, dia_semana: 0, desde: '', hasta: '', abierto: true,
+        apertura_manana: '09:00', cierre_manana: '16:00', apertura_tarde: '19:00', cierre_tarde: '00:00'
+      });
+      loadConfig();
+    } catch (err) {
+      showToast("Error al guardar horario del bar", "error");
+    }
+  };
+
+  const handleDeleteStoreHours = async (id) => {
+    if (!window.confirm("¿Seguro que deseas eliminar este horario?")) return;
+    try {
+      await api.delete(`/configuracion/horario-bar/${id}`);
+      showToast("Horario comercial eliminado", "success");
       loadConfig();
     } catch (e) {
-      showToast("Error al guardar horarios del bar", "error");
+      showToast("Error al eliminar horario", "error");
     }
   };
 
@@ -1230,58 +1257,194 @@ export default function App() {
       {/* 9. Bar Opening Hours Configuration Modal */}
       {isStoreHoursModalOpen && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[28px] max-w-2xl w-full space-y-4 text-left">
-            <h3 className="text-lg font-black text-slate-100 tracking-tight">Configurar Horario del Bar</h3>
-            <p className="text-xs text-slate-400">Establece las horas de apertura de mañana y tarde/noche por día de la semana. Los turnos de personal generados se ceñirán a estas horas.</p>
-
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
-              {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((dayName, idx) => {
-                const bh = editingStoreHours.find(h => h.dia_semana === idx) || { dia_semana: idx, abierto: false, apertura_manana: '', cierre_manana: '', apertura_tarde: '', cierre_tarde: '' };
-                return (
-                  <div key={idx} className="p-3 bg-slate-850 rounded-xl border border-slate-800 flex items-center justify-between flex-wrap gap-3">
-                    <span className="font-bold text-xs w-20 text-slate-200">{dayName}</span>
-                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-400">
-                      <input 
-                        type="checkbox" 
-                        checked={bh.abierto} 
-                        onChange={(e) => {
-                          const val = e.target.checked;
-                          setEditingStoreHours(editingStoreHours.map(h => h.dia_semana === idx ? {...h, abierto: val} : h));
-                        }}
-                        className="rounded border-slate-750 bg-slate-900 text-indigo-600 focus:ring-0"
-                      />
-                      Abierto
-                    </label>
-
-                    {bh.abierto && (
-                      <div className="flex flex-wrap gap-2 text-xs font-bold text-slate-400">
-                        <div className="flex items-center gap-1">
-                          <span>M:</span>
-                          <input type="time" value={bh.apertura_manana || ''} onChange={e => setEditingStoreHours(editingStoreHours.map(h => h.dia_semana === idx ? {...h, apertura_manana: e.target.value} : h))} className="border border-slate-750 p-1.5 rounded-lg bg-slate-900 text-slate-250 w-20 font-mono text-[10px]"/>
-                          <span>-</span>
-                          <input type="time" value={bh.cierre_manana || ''} onChange={e => setEditingStoreHours(editingStoreHours.map(h => h.dia_semana === idx ? {...h, cierre_manana: e.target.value} : h))} className="border border-slate-750 p-1.5 rounded-lg bg-slate-900 text-slate-250 w-20 font-mono text-[10px]"/>
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-4xl w-full flex flex-col md:flex-row gap-6 max-h-[85vh] text-left">
+            
+            {/* Left side: List current opening hours */}
+            <div className="w-full md:w-1/2 flex flex-col overflow-y-auto pr-2">
+              <h3 className="text-lg font-black text-slate-100 tracking-tight mb-2">Horarios del Bar</h3>
+              <p className="text-[10px] text-slate-500 leading-relaxed mb-4">
+                Listado de horarios por día de la semana y rangos de fechas (temporadas). Las reglas de temporada sobreescriben a las generales.
+              </p>
+              
+              <div className="space-y-2 flex-1">
+                {storeHours.map(bh => {
+                  const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                  const isSeasonal = !!bh.desde;
+                  return (
+                    <div 
+                      key={bh.id} 
+                      onClick={() => {
+                        setBarHoursForm(bh);
+                        setBarHoursType(isSeasonal ? 'seasonal' : 'always');
+                      }}
+                      className="p-3 bg-slate-850 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl flex justify-between items-center text-xs cursor-pointer transition-all"
+                      title="Haz clic para editar este horario"
+                    >
+                      <div className="text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-200">{dayNames[bh.dia_semana]}</span>
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            isSeasonal ? 'bg-indigo-950/50 text-indigo-400 border border-indigo-900/30' : 'bg-slate-900 text-slate-400'
+                          }`}>
+                            {isSeasonal ? `${bh.desde} a ${bh.hasta}` : 'Todo el año'}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <span>T/N:</span>
-                          <input type="time" value={bh.apertura_tarde || ''} onChange={e => setEditingStoreHours(editingStoreHours.map(h => h.dia_semana === idx ? {...h, apertura_tarde: e.target.value} : h))} className="border border-slate-750 p-1.5 rounded-lg bg-slate-900 text-slate-250 w-20 font-mono text-[10px]"/>
-                          <span>-</span>
-                          <input type="time" value={bh.cierre_tarde || ''} onChange={e => setEditingStoreHours(editingStoreHours.map(h => h.dia_semana === idx ? {...h, cierre_tarde: e.target.value} : h))} className="border border-slate-750 p-1.5 rounded-lg bg-slate-900 text-slate-250 w-20 font-mono text-[10px]"/>
-                        </div>
+                        <p className="text-slate-400 mt-1 font-bold">
+                          {bh.abierto ? (
+                            <span>
+                              {bh.apertura_manana}-{bh.cierre_manana}
+                              {bh.apertura_tarde && ` / ${bh.apertura_tarde}-${bh.cierre_tarde}`}
+                            </span>
+                          ) : (
+                            <span className="text-rose-400 font-bold">Cerrado</span>
+                          )}
+                        </p>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                      {isSeasonal && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteStoreHours(bh.id);
+                          }} 
+                          className="p-1 hover:text-rose-400 text-slate-500 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={12}/>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="flex gap-2 pt-2 border-t border-slate-800">
-              <button type="button" onClick={handleSaveStoreHours} className="flex-1 py-3 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center transition-all cursor-pointer">
-                Guardar Cambios
-              </button>
-              <button type="button" onClick={() => setIsStoreHoursModalOpen(false)} className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-700 cursor-pointer">
-                Cerrar
-              </button>
-            </div>
+            {/* Right side: Add/Edit form */}
+            <form onSubmit={handleSaveStoreHours} className="w-full md:w-1/2 space-y-4 bg-slate-950/20 p-5 rounded-2xl border border-slate-800 text-left flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-850">
+                  <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
+                    {barHoursForm.id ? 'Editar Horario' : 'Añadir Horario'}
+                  </h4>
+                  {barHoursForm.id && (
+                    <button 
+                      type="button" 
+                      onClick={() => setBarHoursForm({ id: null, dia_semana: 0, desde: '', hasta: '', abierto: true, apertura_manana: '09:00', cierre_manana: '16:00', apertura_tarde: '19:00', cierre_tarde: '00:00' })}
+                      className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:underline cursor-pointer"
+                    >
+                      Limpiar / Nuevo
+                    </button>
+                  )}
+                </div>
+                
+                {/* Type Switcher */}
+                <div className="flex gap-1.5 bg-slate-900 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setBarHoursType('always')}
+                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                      barHoursType === 'always' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Todo el año
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBarHoursType('seasonal')}
+                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                      barHoursType === 'seasonal' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Temporada
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Día de la Semana</label>
+                  <select 
+                    value={barHoursForm.dia_semana} 
+                    onChange={e => setBarHoursForm({...barHoursForm, dia_semana: parseInt(e.target.value)})} 
+                    className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none"
+                  >
+                    {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((dayName, idx) => (
+                      <option key={idx} value={idx}>{dayName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {barHoursType === 'seasonal' && (
+                  <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Desde</label>
+                      <input 
+                        type="date" 
+                        value={barHoursForm.desde || ''} 
+                        onChange={e => setBarHoursForm({...barHoursForm, desde: e.target.value})} 
+                        className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Hasta</label>
+                      <input 
+                        type="date" 
+                        value={barHoursForm.hasta || ''} 
+                        onChange={e => setBarHoursForm({...barHoursForm, hasta: e.target.value})} 
+                        className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 py-2">
+                  <input 
+                    type="checkbox" 
+                    id="bh-abierto"
+                    checked={barHoursForm.abierto} 
+                    onChange={e => setBarHoursForm({...barHoursForm, abierto: e.target.checked})}
+                    className="rounded border-slate-750 bg-slate-900 text-indigo-600 focus:ring-0 cursor-pointer"
+                  />
+                  <label htmlFor="bh-abierto" className="text-xs font-bold text-slate-350 cursor-pointer select-none">
+                    Bar Abierto al público este día
+                  </label>
+                </div>
+
+                {barHoursForm.abierto && (
+                  <div className="space-y-3 p-3.5 bg-slate-950/40 rounded-xl border border-slate-855 animate-in slide-in-from-top-2 duration-200">
+                    <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-400">
+                      <div>
+                        <label className="block text-[8px] font-black uppercase mb-1">Apertura Mañana</label>
+                        <input type="time" value={barHoursForm.apertura_manana || ''} onChange={e => setBarHoursForm({...barHoursForm, apertura_manana: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black uppercase mb-1">Cierre Mañana</label>
+                        <input type="time" value={barHoursForm.cierre_manana || ''} onChange={e => setBarHoursForm({...barHoursForm, cierre_manana: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-xs font-bold text-slate-400">
+                      <div>
+                        <label className="block text-[8px] font-black uppercase mb-1">Apertura Tarde/Noche</label>
+                        <input type="time" value={barHoursForm.apertura_tarde || ''} onChange={e => setBarHoursForm({...barHoursForm, apertura_tarde: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black uppercase mb-1">Cierre Tarde/Noche</label>
+                        <input type="time" value={barHoursForm.cierre_tarde || ''} onChange={e => setBarHoursForm({...barHoursForm, cierre_tarde: e.target.value})} className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-slate-250 font-mono text-xs"/>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-4 border-t border-slate-800">
+                <button type="submit" className="flex-1 py-3 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center transition-all cursor-pointer">
+                  Guardar Horario
+                </button>
+                <button type="button" onClick={() => setIsStoreHoursModalOpen(false)} className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-700 cursor-pointer">
+                  Cerrar
+                </button>
+              </div>
+            </form>
+
           </div>
         </div>
       )}

@@ -51,7 +51,8 @@ def test_database_creation_and_seeding():
         session.add(hb)
         session.commit()
         
-        db_hb = session.get(HorarioBar, 0)
+        session.refresh(hb)
+        db_hb = session.get(HorarioBar, hb.id)
         assert db_hb.apertura_manana == "09:00"
         print("[Test] Opening Hours model verified!")
 

@@ -23,24 +23,39 @@ router = APIRouter(tags=["configuracion"])
 # === HORARIOS APERTURA BAR ===
 @router.get("/api/configuracion/horario-bar", response_model=List[HorarioBarRead])
 def get_horario_bar(session: Session = Depends(get_session)):
-    return session.exec(select(HorarioBar).order_by(HorarioBar.dia_semana)).all()
+    return session.exec(select(HorarioBar).order_by(HorarioBar.desde, HorarioBar.dia_semana)).all()
 
 @router.post("/api/configuracion/horario-bar", response_model=HorarioBarRead)
 def save_horario_bar(hb: HorarioBar, session: Session = Depends(get_session)):
-    db_hb = session.get(HorarioBar, hb.dia_semana)
-    if db_hb:
-        db_hb.abierto = hb.abierto
-        db_hb.apertura_manana = hb.apertura_manana
-        db_hb.cierre_manana = hb.cierre_manana
-        db_hb.apertura_tarde = hb.apertura_tarde
-        db_hb.cierre_tarde = hb.cierre_tarde
-        session.add(db_hb)
-    else:
-        session.add(hb)
-        db_hb = hb
+    if hb.id:
+        db_hb = session.get(HorarioBar, hb.id)
+        if db_hb:
+            db_hb.dia_semana = hb.dia_semana
+            db_hb.desde = hb.desde
+            db_hb.hasta = hb.hasta
+            db_hb.abierto = hb.abierto
+            db_hb.apertura_manana = hb.apertura_manana
+            db_hb.cierre_manana = hb.cierre_manana
+            db_hb.apertura_tarde = hb.apertura_tarde
+            db_hb.cierre_tarde = hb.cierre_tarde
+            session.add(db_hb)
+            session.commit()
+            session.refresh(db_hb)
+            return db_hb
+            
+    session.add(hb)
     session.commit()
-    session.refresh(db_hb)
-    return db_hb
+    session.refresh(hb)
+    return hb
+
+@router.delete("/api/configuracion/horario-bar/{id}")
+def delete_horario_bar(id: int, session: Session = Depends(get_session)):
+    db_hb = session.get(HorarioBar, id)
+    if not db_hb:
+        raise HTTPException(status_code=404, detail="Horario no encontrado")
+    session.delete(db_hb)
+    session.commit()
+    return {"detail": "Horario eliminado correctamente"}
 
 
 # === COBERTURAS REQUERIDAS POR ROL ===

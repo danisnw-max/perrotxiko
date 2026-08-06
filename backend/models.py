@@ -84,7 +84,10 @@ class HorarioTrabajador(SQLModel, table=True):
     notas: Optional[str] = None
 
 class HorarioBar(SQLModel, table=True):
-    dia_semana: int = Field(primary_key=True)  # 0=Lunes, 6=Domingo
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dia_semana: int = Field(index=True)  # 0=Lunes, 6=Domingo
+    desde: Optional[str] = Field(default=None, index=True)  # YYYY-MM-DD
+    hasta: Optional[str] = Field(default=None, index=True)  # YYYY-MM-DD
     abierto: bool = Field(default=True)
     apertura_manana: Optional[str] = None  # HH:MM
     cierre_manana: Optional[str] = None  # HH:MM

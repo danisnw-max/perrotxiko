@@ -64,7 +64,10 @@ class HorarioTrabajadorRead(HorarioTrabajadorBase):
     pass
 
 class HorarioBarBase(BaseModel):
+    id: Optional[int] = None
     dia_semana: int
+    desde: Optional[str] = None
+    hasta: Optional[str] = None
     abierto: bool = True
     apertura_manana: Optional[str] = None
     cierre_manana: Optional[str] = None

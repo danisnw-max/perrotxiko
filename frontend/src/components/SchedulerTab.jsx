@@ -61,29 +61,7 @@ const SchedulerTab = ({
             <Sparkles size={14} className="mr-1.5"/> Auto-Generar Horario
           </button>
           
-          <button 
-            onClick={() => {
-              let nextId = 'E-001';
-              if (employees.length > 0) {
-                const eIds = employees.map(e => parseInt(e.id.replace('E-', '')) || 0);
-                const maxId = Math.max(...eIds);
-                nextId = `E-${String(maxId + 1).padStart(3, '0')}`;
-              }
-              setEmployeeForm({ 
-                id: nextId, nombre: '', puesto: 'Sala', telefono: '', email: '', 
-                horas_semanales: 40, pin: '', nif: '', nass: '', direccion: '', 
-                iban: '', fecha_nacimiento: '', fecha_alta: '', tipo_contrato: 'Indefinido', 
-                salario_base: 0, vacaciones_totales: 30, dias_libre_disposicion_totales: 2, 
-                preferencia_turno: 'Alterno' 
-              }); 
-              setEditingEmployeeId(null); 
-              setIsEmployeeModalOpen(true); 
-            }} 
-            className="py-2.5 px-4.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md flex items-center transition-all cursor-pointer"
-          >
-            <Users size={14} className="mr-1.5"/> Plantilla Bar
-          </button>
-          
+
           <button 
             onClick={() => setIsStoreHoursModalOpen(true)} 
             className="py-2.5 px-4.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-350 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"

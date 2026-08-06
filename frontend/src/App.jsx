@@ -50,7 +50,7 @@ export default function App() {
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
   const [employeeForm, setEmployeeForm] = useState({
-    id: '', nombre: '', puesto: 'Camarero', telefono: '', email: '', 
+    id: '', nombre: '', puesto: 'Sala', telefono: '', email: '', 
     horas_semanales: 40, pin: '', nif: '', nass: '', direccion: '', 
     iban: '', fecha_nacimiento: '', fecha_alta: '', tipo_contrato: 'Indefinido', 
     salario_base: 0, vacaciones_totales: 30, dias_libre_disposicion_totales: 2, 
@@ -79,8 +79,9 @@ export default function App() {
   // Role Coverages Modal
   const [isRefuerzosModalOpen, setIsRefuerzosModalOpen] = useState(false);
   const [coverageForm, setCoverageForm] = useState({
-    id: null, dia_semana: 0, turno: 'Mañana', puesto: 'Camarero', cantidad: 1
+    id: null, dia_semana: 0, fecha: '', turno: 'Mañana', puesto: 'Sala', cantidad: 1, descripcion: ''
   });
+  const [coverageType, setCoverageType] = useState('weekday');
 
   // Holidays Modal
   const [isFestivosModalOpen, setIsFestivosModalOpen] = useState(false);
@@ -353,9 +354,15 @@ export default function App() {
   const handleSaveCoverage = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/configuracion/coberturas', coverageForm);
+      const payload = {
+        ...coverageForm,
+        dia_semana: coverageType === 'weekday' ? coverageForm.dia_semana : null,
+        fecha: coverageType === 'date' ? coverageForm.fecha : null,
+        descripcion: coverageType === 'date' ? coverageForm.descripcion : null
+      };
+      await api.post('/configuracion/coberturas', payload);
       showToast("Regla de cobertura guardada", "success");
-      setCoverageForm({ id: null, dia_semana: 0, turno: 'Mañana', puesto: 'Camarero', cantidad: 1 });
+      setCoverageForm({ id: null, dia_semana: 0, fecha: '', turno: 'Mañana', puesto: 'Sala', cantidad: 1, descripcion: '' });
       loadConfig();
     } catch (err) {
       showToast("Error al guardar cobertura", "error");
@@ -692,7 +699,7 @@ export default function App() {
                     nextId = `E-${String(maxId + 1).padStart(3, '0')}`;
                   }
                   setEmployeeForm({ 
-                    id: nextId, nombre: '', puesto: 'Camarero', telefono: '', email: '', 
+                    id: nextId, nombre: '', puesto: 'Sala', telefono: '', email: '', 
                     horas_semanales: 40, pin: '', nif: '', nass: '', direccion: '', 
                     iban: '', fecha_nacimiento: '', fecha_alta: '', tipo_contrato: 'Indefinido', 
                     salario_base: 0, vacaciones_totales: 30, dias_libre_disposicion_totales: 2, 
@@ -958,7 +965,7 @@ export default function App() {
                   <div>
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Puesto / Rol</label>
                     <select value={employeeForm.puesto} onChange={e => setEmployeeForm({...employeeForm, puesto: e.target.value})} className="w-full border border-slate-755 p-2.5 rounded-xl bg-slate-950/40 text-xs font-bold text-slate-200 outline-none">
-                      <option value="Camarero">Camarero / Sala</option>
+                      <option value="Sala">Sala / Servicio Mesas</option>
                       <option value="Barra">Barra / Coctelería</option>
                       <option value="Cocinero">Cocinero / Cocina</option>
                       <option value="Encargado">Encargado / Maître</option>
@@ -1292,10 +1299,15 @@ export default function App() {
               <div className="space-y-2 flex-1">
                 {coberturas.map(c => {
                   const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+                  const isDateRule = !!c.fecha;
+                  const label = isDateRule ? c.fecha : dayNames[c.dia_semana];
                   return (
                     <div key={c.id} className="p-3 bg-slate-850 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
                       <div>
-                        <span className="font-bold text-slate-200">{dayNames[c.dia_semana]}</span>
+                        <span className={`font-bold ${isDateRule ? 'text-indigo-400 font-mono' : 'text-slate-200'}`}>{label}</span>
+                        {c.descripcion && (
+                          <span className="text-[9px] text-slate-550 font-bold ml-1.5 uppercase tracking-wider">({c.descripcion})</span>
+                        )}
                         <span className="text-slate-500 mx-2">|</span>
                         <span className="text-indigo-400 font-bold">{c.turno}</span>
                         <p className="text-slate-400 mt-1 font-bold">{c.puesto}: {c.cantidad} pers.</p>
@@ -1316,14 +1328,61 @@ export default function App() {
             <form onSubmit={handleSaveCoverage} className="w-full md:w-1/2 space-y-4 bg-slate-950/20 p-5 rounded-2xl border border-slate-800 text-left">
               <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider pb-2 border-b border-slate-800">Añadir Regla</h4>
               
-              <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Día de la Semana</label>
-                <select value={coverageForm.dia_semana} onChange={e => setCoverageForm({...coverageForm, dia_semana: parseInt(e.target.value)})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none">
-                  {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((dayName, idx) => (
-                    <option key={idx} value={idx}>{dayName}</option>
-                  ))}
-                </select>
+              {/* Type Switcher */}
+              <div className="flex gap-1.5 bg-slate-900 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setCoverageType('weekday')}
+                  className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                    coverageType === 'weekday' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Recurrente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverageType('date')}
+                  className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                    coverageType === 'date' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Fecha Especial
+                </button>
               </div>
+
+              {coverageType === 'weekday' ? (
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Día de la Semana</label>
+                  <select value={coverageForm.dia_semana} onChange={e => setCoverageForm({...coverageForm, dia_semana: parseInt(e.target.value)})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none">
+                    {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((dayName, idx) => (
+                      <option key={idx} value={idx}>{dayName}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Fecha Específica</label>
+                    <input 
+                      type="date" 
+                      value={coverageForm.fecha || ''} 
+                      onChange={e => setCoverageForm({...coverageForm, fecha: e.target.value})} 
+                      className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Descripción del Evento</label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej. Concierto Local, Partido de Fútbol" 
+                      value={coverageForm.descripcion || ''} 
+                      onChange={e => setCoverageForm({...coverageForm, descripcion: e.target.value})} 
+                      className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Turno del Bar</label>
@@ -1337,7 +1396,7 @@ export default function App() {
               <div>
                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Puesto Requerido</label>
                 <select value={coverageForm.puesto} onChange={e => setCoverageForm({...coverageForm, puesto: e.target.value})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none">
-                  <option value="Camarero">Camarero</option>
+                  <option value="Sala">Sala</option>
                   <option value="Barra">Barra</option>
                   <option value="Cocinero">Cocinero</option>
                   <option value="Encargado">Encargado</option>

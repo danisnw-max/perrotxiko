@@ -79,10 +79,12 @@ class HorarioBarRead(HorarioBarBase):
 
 class CoberturaRequeridaBase(BaseModel):
     id: Optional[int] = None
-    dia_semana: int
+    dia_semana: Optional[int] = None
+    fecha: Optional[str] = None
     turno: str
     puesto: str
     cantidad: int = 1
+    descripcion: Optional[str] = None
 
 class CoberturaRequeridaCreate(CoberturaRequeridaBase):
     pass

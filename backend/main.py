@@ -46,8 +46,8 @@ def seed_database(session: Session):
             Empleado(id="E-001", nombre="Daniel Encargado", puesto="Encargado", telefono="600111222", email="daniel@aterpebar.com", pin="1234", horas_semanales=40, tipo_contrato="Indefinido", salario_base=1800, preferencia_turno="Alterno"),
             Empleado(id="E-002", nombre="Mikel Cocinero", puesto="Cocinero", telefono="600333444", email="mikel@aterpebar.com", pin="2345", horas_semanales=40, tipo_contrato="Indefinido", salario_base=1600, preferencia_turno="Mañanas"),
             Empleado(id="E-003", nombre="Sara Cocinera", puesto="Cocinero", telefono="600444555", email="sara@aterpebar.com", pin="3456", horas_semanales=30, tipo_contrato="Temporal", salario_base=1200, preferencia_turno="Tardes"),
-            Empleado(id="E-004", nombre="Ane Camarera", puesto="Camarero", telefono="600555666", email="ane@aterpebar.com", pin="4567", horas_semanales=40, tipo_contrato="Indefinido", salario_base=1300, preferencia_turno="Alterno"),
-            Empleado(id="E-005", nombre="Jon Camarero", puesto="Camarero", telefono="600666777", email="jon@aterpebar.com", pin="5678", horas_semanales=20, tipo_contrato="Temporal", salario_base=700, preferencia_turno="Tardes"),
+            Empleado(id="E-004", nombre="Ane Camarera", puesto="Sala", telefono="600555666", email="ane@aterpebar.com", pin="4567", horas_semanales=40, tipo_contrato="Indefinido", salario_base=1300, preferencia_turno="Alterno"),
+            Empleado(id="E-005", nombre="Jon Camarero", puesto="Sala", telefono="600666777", email="jon@aterpebar.com", pin="5678", horas_semanales=20, tipo_contrato="Temporal", salario_base=700, preferencia_turno="Tardes"),
             Empleado(id="E-006", nombre="Lander Barra", puesto="Barra", telefono="600777888", email="lander@aterpebar.com", pin="6789", horas_semanales=40, tipo_contrato="Indefinido", salario_base=1300, preferencia_turno="Noches"),
             Empleado(id="E-007", nombre="Marta Limpieza", puesto="Limpieza", telefono="600888999", email="marta@aterpebar.com", pin="9999", horas_semanales=15, tipo_contrato="Indefinido", salario_base=500, preferencia_turno="Mañanas"),
         ]
@@ -93,27 +93,27 @@ def seed_database(session: Session):
         for d in range(5):
             # Mañana
             session.add(CoberturaRequerida(dia_semana=d, turno="Mañana", puesto="Cocinero", cantidad=1))
-            session.add(CoberturaRequerida(dia_semana=d, turno="Mañana", puesto="Camarero", cantidad=1))
+            session.add(CoberturaRequerida(dia_semana=d, turno="Mañana", puesto="Sala", cantidad=1))
             # Tarde/Noche
             session.add(CoberturaRequerida(dia_semana=d, turno="Tarde", puesto="Cocinero", cantidad=1))
-            session.add(CoberturaRequerida(dia_semana=d, turno="Tarde", puesto="Camarero", cantidad=1))
+            session.add(CoberturaRequerida(dia_semana=d, turno="Tarde", puesto="Sala", cantidad=1))
             session.add(CoberturaRequerida(dia_semana=d, turno="Tarde", puesto="Barra", cantidad=1))
             session.add(CoberturaRequerida(dia_semana=d, turno="Tarde", puesto="Encargado", cantidad=1))
 
         # Weekend: Viernes/Sábado (dia_semana 4 & 5) - we add reinforcement
         # Friday tarde/noche needs extra
-        session.add(CoberturaRequerida(dia_semana=4, turno="Tarde", puesto="Camarero", cantidad=2)) # Total 3 camareros
+        session.add(CoberturaRequerida(dia_semana=4, turno="Tarde", puesto="Sala", cantidad=2)) # Total 3 camareros
         # Saturday
         session.add(CoberturaRequerida(dia_semana=5, turno="Mañana", puesto="Cocinero", cantidad=1))
-        session.add(CoberturaRequerida(dia_semana=5, turno="Mañana", puesto="Camarero", cantidad=2))
+        session.add(CoberturaRequerida(dia_semana=5, turno="Mañana", puesto="Sala", cantidad=2))
         session.add(CoberturaRequerida(dia_semana=5, turno="Tarde", puesto="Cocinero", cantidad=2))
-        session.add(CoberturaRequerida(dia_semana=5, turno="Tarde", puesto="Camarero", cantidad=3))
+        session.add(CoberturaRequerida(dia_semana=5, turno="Tarde", puesto="Sala", cantidad=3))
         session.add(CoberturaRequerida(dia_semana=5, turno="Tarde", puesto="Barra", cantidad=2))
         session.add(CoberturaRequerida(dia_semana=5, turno="Tarde", puesto="Encargado", cantidad=1))
 
         # Sunday (dia_semana 6)
         session.add(CoberturaRequerida(dia_semana=6, turno="Mañana", puesto="Cocinero", cantidad=1))
-        session.add(CoberturaRequerida(dia_semana=6, turno="Mañana", puesto="Camarero", cantidad=2))
+        session.add(CoberturaRequerida(dia_semana=6, turno="Mañana", puesto="Sala", cantidad=2))
 
         session.commit()
         print("Default CoberturaRequerida seeded!")

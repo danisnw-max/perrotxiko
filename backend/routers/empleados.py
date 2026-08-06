@@ -660,29 +660,33 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         if not bh or not bh.abierto:
             continue
             
-        # Build required slots based on CoberturaRequerida for this weekday
-        day_coberturas = [c for c in coberturas_list if c.dia_semana == weekday]
+        # Build required slots based on CoberturaRequerida (date-specific takes priority over weekday)
+        date_coberturas = [c for c in coberturas_list if c.fecha == date_str]
+        if date_coberturas:
+            day_coberturas = date_coberturas
+        else:
+            day_coberturas = [c for c in coberturas_list if c.dia_semana == weekday and (c.fecha is None or c.fecha == "")]
         
         slots = []
         # Fallback default coverages if none configured in DB
         if not day_coberturas:
-            # Morning: 1 Cocinero, 1 Camarero. Afternoon/Evening: 1 Cocinero, 2 Camarero
+            # Morning: 1 Cocinero, 1 Sala. Afternoon/Evening: 1 Cocinero, 2 Sala
             if bh.apertura_manana and bh.cierre_manana:
-                slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, "Cocinero", 0))
-                slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, "Camarero", 0))
+                slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, "Cocinero", 0, None))
+                slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, "Sala", 0, None))
             if bh.apertura_tarde and bh.cierre_tarde:
-                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Cocinero", 0))
-                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Camarero", 0))
-                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Camarero", 1))
+                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Cocinero", 0, None))
+                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Sala", 0, None))
+                slots.append(("Tarde", bh.apertura_tarde, bh.cierre_tarde, "Sala", 1, None))
         else:
             for cob in day_coberturas:
                 # Map shift name to time slots
                 if cob.turno == "Mañana" and bh.apertura_manana and bh.cierre_manana:
                     for idx in range(cob.cantidad):
-                        slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, cob.puesto, idx))
+                        slots.append(("Mañana", bh.apertura_manana, bh.cierre_manana, cob.puesto, idx, cob.descripcion))
                 elif cob.turno in ["Tarde", "Noche"] and bh.apertura_tarde and bh.cierre_tarde:
                     for idx in range(cob.cantidad):
-                        slots.append((cob.turno, bh.apertura_tarde, bh.cierre_tarde, cob.puesto, idx))
+                        slots.append((cob.turno, bh.apertura_tarde, bh.cierre_tarde, cob.puesto, idx, cob.descripcion))
         
         if not slots:
             continue
@@ -703,7 +707,18 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         candidate_pools = []
         for slot in slots:
             role_req = slot[3]
-            matching_emps = [e for e in employees if e.puesto.lower() == role_req.lower() and e.estado == "Activo"]
+            
+            def is_matching_role(emp_puesto: str, req_puesto: str) -> bool:
+                ep = emp_puesto.lower()
+                rp = req_puesto.lower()
+                if ep == rp:
+                    return True
+                # Map Sala and Camarero as synonyms
+                if rp in ["sala", "camarero"] and ep in ["sala", "camarero"]:
+                    return True
+                return False
+                
+            matching_emps = [e for e in employees if is_matching_role(e.puesto, role_req) and e.estado == "Activo"]
             # Add None option to represent unassigned/coverage gap
             candidate_pools.append(matching_emps + [None])
             
@@ -729,13 +744,17 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         if not candidates:
             # Create all slots as unassigned
             for slot in slots:
+                slot_name, s_start, s_end, role_req, _, slot_desc = slot
+                cov_notes = f"Necesidad Cobertura: {role_req} Sin Asignar"
+                if slot_desc:
+                    cov_notes += f" ({slot_desc})"
                 cov_shift = HorarioTrabajador(
                     empleado_id="",
                     fecha=date_str,
-                    turno=f"{slot[0]} (Cobertura)",
-                    hora_inicio=slot[1],
-                    hora_fin=slot[2],
-                    notas=f"Necesidad Cobertura: {slot[3]} Sin Asignar"
+                    turno=f"{slot_name} (Cobertura)",
+                    hora_inicio=s_start,
+                    hora_fin=s_end,
+                    notas=cov_notes
                 )
                 session.add(cov_shift)
             continue
@@ -747,7 +766,7 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
             assigned_today = set()
             
             for i, emp in enumerate(cand):
-                slot_name, s_start, s_end, role_req, _ = slots[i]
+                slot_name, s_start, s_end, role_req, _, slot_desc = slots[i]
                 s_start_min = parse_time_to_minutes(s_start)
                 s_end_min = parse_time_to_minutes(s_end)
                 slot_duration = s_end_min - s_start_min
@@ -844,16 +863,19 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         
         pending_coverages = []
         for i, emp in enumerate(best_cand):
-            slot_name, s_start, s_end, role_req, _ = slots[i]
+            slot_name, s_start, s_end, role_req, _, slot_desc = slots[i]
             if emp is None:
                 # Add unassigned slot directly
+                cov_notes = f"Necesidad Cobertura: {role_req} Sin Asignar"
+                if slot_desc:
+                    cov_notes += f" ({slot_desc})"
                 cov_shift = HorarioTrabajador(
                     empleado_id="",
                     fecha=date_str,
                     turno=f"{slot_name} (Cobertura)",
                     hora_inicio=s_start,
                     hora_fin=s_end,
-                    notas=f"Necesidad Cobertura: {role_req} Sin Asignar"
+                    notas=cov_notes
                 )
                 session.add(cov_shift)
                 continue
@@ -867,8 +889,12 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                 sh_end = format_minutes_to_time(f_end_min)
                 is_adjusted = (sh_start != s_start or sh_end != s_end)
                 notes = f"Generado: {role_req}"
+                if slot_desc:
+                    notes += f" ({slot_desc})"
                 if is_adjusted:
                     notes = f"Ajustado por restricción ({role_req})"
+                    if slot_desc:
+                        notes += f" - {slot_desc}"
                     
                 new_shift = HorarioTrabajador(
                     empleado_id=emp.id,

@@ -70,7 +70,7 @@ const SchedulerTab = ({
                 nextId = `E-${String(maxId + 1).padStart(3, '0')}`;
               }
               setEmployeeForm({ 
-                id: nextId, nombre: '', puesto: 'Camarero', telefono: '', email: '', 
+                id: nextId, nombre: '', puesto: 'Sala', telefono: '', email: '', 
                 horas_semanales: 40, pin: '', nif: '', nass: '', direccion: '', 
                 iban: '', fecha_nacimiento: '', fecha_alta: '', tipo_contrato: 'Indefinido', 
                 salario_base: 0, vacaciones_totales: 30, dias_libre_disposicion_totales: 2, 
@@ -319,7 +319,7 @@ const SchedulerTab = ({
                           } else {
                             const role = emp?.puesto?.toLowerCase() || '';
                             if (role === 'cocinero') tagStyle = "bg-emerald-950/40 border-emerald-900/50 text-emerald-400";
-                            else if (role === 'camarero') tagStyle = "bg-amber-950/40 border-amber-900/50 text-amber-400";
+                            else if (role === 'camarero' || role === 'sala') tagStyle = "bg-amber-950/40 border-amber-900/50 text-amber-400";
                             else if (role === 'barra') tagStyle = "bg-purple-950/40 border-purple-900/50 text-purple-400";
                             else if (role === 'encargado') tagStyle = "bg-sky-950/40 border-sky-900/50 text-sky-400";
                             else if (role === 'limpieza') tagStyle = "bg-slate-800/40 border-slate-700/50 text-slate-350";

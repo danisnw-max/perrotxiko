@@ -93,10 +93,12 @@ class HorarioBar(SQLModel, table=True):
 
 class CoberturaRequerida(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    dia_semana: int = Field(index=True)  # 0=Lunes, 6=Domingo
+    dia_semana: Optional[int] = Field(default=None, index=True)  # 0=Lunes, 6=Domingo, None si es por fecha específica
+    fecha: Optional[str] = Field(default=None, index=True)       # YYYY-MM-DD, None si es recurrente por día de semana
     turno: str = Field(index=True)       # Mañana, Tarde, Noche
-    puesto: str = Field(index=True)      # Camarero, Cocinero, Barra, Encargado, Limpieza
+    puesto: str = Field(index=True)      # Sala, Barra, Cocinero, etc.
     cantidad: int = Field(default=1)     # Número de trabajadores requeridos
+    descripcion: Optional[str] = Field(default=None)  # Descripción de la necesidad especial (ej. "Concierto", "Fútbol")
 
 class SMTPConfig(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

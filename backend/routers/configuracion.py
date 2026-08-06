@@ -46,7 +46,7 @@ def save_horario_bar(hb: HorarioBar, session: Session = Depends(get_session)):
 # === COBERTURAS REQUERIDAS POR ROL ===
 @router.get("/api/configuracion/coberturas", response_model=List[CoberturaRequeridaRead])
 def get_coberturas(session: Session = Depends(get_session)):
-    return session.exec(select(CoberturaRequerida).order_by(CoberturaRequerida.dia_semana, CoberturaRequerida.turno)).all()
+    return session.exec(select(CoberturaRequerida).order_by(CoberturaRequerida.fecha, CoberturaRequerida.dia_semana, CoberturaRequerida.turno)).all()
 
 @router.post("/api/configuracion/coberturas", response_model=CoberturaRequeridaRead)
 def save_cobertura(cob: CoberturaRequerida, session: Session = Depends(get_session)):
@@ -54,9 +54,11 @@ def save_cobertura(cob: CoberturaRequerida, session: Session = Depends(get_sessi
         db_cob = session.get(CoberturaRequerida, cob.id)
         if db_cob:
             db_cob.dia_semana = cob.dia_semana
+            db_cob.fecha = cob.fecha
             db_cob.turno = cob.turno
             db_cob.puesto = cob.puesto
             db_cob.cantidad = cob.cantidad
+            db_cob.descripcion = cob.descripcion
             session.add(db_cob)
             session.commit()
             session.refresh(db_cob)

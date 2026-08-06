@@ -50,7 +50,7 @@ export default function App() {
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
   const [employeeForm, setEmployeeForm] = useState({
-    id: '', nombre: '', puesto: 'Sala', telefono: '', email: '', 
+    id: '', nombre: '', puesto: 'Sala', roles_adicionales: '', telefono: '', email: '', 
     horas_semanales: 40, pin: '', nif: '', nass: '', direccion: '', 
     iban: '', fecha_nacimiento: '', fecha_alta: '', tipo_contrato: 'Indefinido', 
     salario_base: 0, vacaciones_totales: 30, dias_libre_disposicion_totales: 2, 
@@ -726,7 +726,7 @@ export default function App() {
                     nextId = `E-${String(maxId + 1).padStart(3, '0')}`;
                   }
                   setEmployeeForm({ 
-                    id: nextId, nombre: '', puesto: 'Sala', telefono: '', email: '', 
+                    id: nextId, nombre: '', puesto: 'Sala', roles_adicionales: '', telefono: '', email: '', 
                     horas_semanales: 40, pin: '', nif: '', nass: '', direccion: '', 
                     iban: '', fecha_nacimiento: '', fecha_alta: '', tipo_contrato: 'Indefinido', 
                     salario_base: 0, vacaciones_totales: 30, dias_libre_disposicion_totales: 2, 
@@ -748,9 +748,16 @@ export default function App() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="font-black text-base text-slate-100">{emp.nombre}</h4>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1 flex items-center gap-1.5">
-                        <Briefcase size={12} className="text-slate-600"/> {emp.puesto} (ID: {emp.id})
-                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                          <Briefcase size={12} className="text-slate-600"/> {emp.puesto} (ID: {emp.id})
+                        </span>
+                        {emp.roles_adicionales && emp.roles_adicionales.split(',').filter(Boolean).map(role => (
+                          <span key={role} className="text-[8px] font-black text-indigo-400 bg-indigo-950/20 border border-indigo-900/30 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                            + {role}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <span className="font-mono text-xs font-black text-indigo-400 bg-indigo-950/40 border border-indigo-900/50 px-2.5 py-0.5 rounded-full">
                       PIN: {emp.pin || '—'}
@@ -990,8 +997,23 @@ export default function App() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Puesto / Rol</label>
-                    <select value={employeeForm.puesto} onChange={e => setEmployeeForm({...employeeForm, puesto: e.target.value})} className="w-full border border-slate-755 p-2.5 rounded-xl bg-slate-950/40 text-xs font-bold text-slate-200 outline-none">
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Puesto / Rol Principal</label>
+                    <select 
+                      value={employeeForm.puesto} 
+                      onChange={e => {
+                        const newPuesto = e.target.value;
+                        const additionalRolesList = employeeForm.roles_adicionales 
+                          ? employeeForm.roles_adicionales.split(',').map(r => r.trim())
+                          : [];
+                        const filteredAdditional = additionalRolesList.filter(r => r !== newPuesto);
+                        setEmployeeForm({
+                          ...employeeForm,
+                          puesto: newPuesto,
+                          roles_adicionales: filteredAdditional.join(',')
+                        });
+                      }} 
+                      className="w-full border border-slate-755 p-2.5 rounded-xl bg-slate-950/40 text-xs font-bold text-slate-200 outline-none"
+                    >
                       <option value="Sala">Sala / Servicio Mesas</option>
                       <option value="Barra">Barra / Coctelería</option>
                       <option value="Cocinero">Cocinero / Cocina</option>
@@ -1011,6 +1033,42 @@ export default function App() {
                   <div>
                     <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">PIN Fichaje (4 dígitos)</label>
                     <input type="text" maxLength={4} placeholder="Ej. 1234" value={employeeForm.pin || ''} onChange={e => setEmployeeForm({...employeeForm, pin: e.target.value.replace(/\D/g, '')})} className="w-full border border-slate-755 p-2.5 rounded-xl bg-slate-950/40 text-xs font-bold text-slate-200 outline-none font-mono" required/>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Puestos / Roles Adicionales Habilitados</label>
+                  <div className="flex flex-wrap gap-4 bg-slate-950/20 p-4 rounded-xl border border-slate-800">
+                    {['Sala', 'Barra', 'Cocinero', 'Encargado', 'Limpieza']
+                      .filter(role => role !== employeeForm.puesto)
+                      .map(role => {
+                        const additionalRolesList = employeeForm.roles_adicionales 
+                          ? employeeForm.roles_adicionales.split(',').map(r => r.trim())
+                          : [];
+                        const isChecked = additionalRolesList.includes(role);
+                        return (
+                          <label key={role} className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-350 select-none">
+                            <input 
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={(e) => {
+                                let newList;
+                                if (e.target.checked) {
+                                  newList = [...additionalRolesList, role];
+                                } else {
+                                  newList = additionalRolesList.filter(r => r !== role);
+                                }
+                                setEmployeeForm({
+                                  ...employeeForm,
+                                  roles_adicionales: newList.join(',')
+                                });
+                              }}
+                              className="rounded border-slate-750 bg-slate-900 text-indigo-600 focus:ring-0 cursor-pointer"
+                            />
+                            {role}
+                          </label>
+                        );
+                      })}
                   </div>
                 </div>
               </div>

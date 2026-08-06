@@ -720,17 +720,22 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         for slot in slots:
             role_req = slot[3]
             
-            def is_matching_role(emp_puesto: str, req_puesto: str) -> bool:
-                ep = emp_puesto.lower()
+            def puede_cubrir_puesto(emp: Empleado, req_puesto: str) -> bool:
                 rp = req_puesto.lower()
+                ep = emp.puesto.lower()
                 if ep == rp:
                     return True
-                # Map Sala and Camarero as synonyms
                 if rp in ["sala", "camarero"] and ep in ["sala", "camarero"]:
                     return True
+                if hasattr(emp, "roles_adicionales") and emp.roles_adicionales:
+                    additional_roles = [r.strip().lower() for r in emp.roles_adicionales.split(",") if r.strip()]
+                    if rp in additional_roles:
+                        return True
+                    if rp in ["sala", "camarero"] and any(r in ["sala", "camarero"] for r in additional_roles):
+                        return True
                 return False
                 
-            matching_emps = [e for e in employees if is_matching_role(e.puesto, role_req) and e.estado == "Activo"]
+            matching_emps = [e for e in employees if puede_cubrir_puesto(e, role_req) and e.estado == "Activo"]
             # Add None option to represent unassigned/coverage gap
             candidate_pools.append(matching_emps + [None])
             

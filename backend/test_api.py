@@ -26,6 +26,7 @@ def test_database_creation_and_seeding():
             id="E-999", 
             nombre="Juan Carlos Cocina", 
             puesto="Cocinero", 
+            roles_adicionales="Barra,Sala",
             pin="1234", 
             horas_semanales=40.0
         )
@@ -37,7 +38,8 @@ def test_database_creation_and_seeding():
         assert db_emp is not None
         assert db_emp.nombre == "Juan Carlos Cocina"
         assert db_emp.puesto == "Cocinero"
-        print("[Test] Employee CRUD model verified!")
+        assert db_emp.roles_adicionales == "Barra,Sala"
+        print("[Test] Employee CRUD model verified with additional roles!")
         
         # Test default opening hours
         hb = HorarioBar(

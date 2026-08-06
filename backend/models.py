@@ -5,6 +5,7 @@ class Empleado(SQLModel, table=True):
     id: str = Field(primary_key=True)
     nombre: str
     puesto: str  # Camarero, Cocinero, Barra, Encargado, Limpieza
+    roles_adicionales: Optional[str] = Field(default=None)  # Comma-separated list (e.g. "Barra")
     telefono: Optional[str] = None
     email: Optional[str] = None
     pin: Optional[str] = Field(default=None)  # Código de 4 dígitos para fichar

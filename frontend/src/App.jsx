@@ -50,7 +50,7 @@ export default function App() {
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState(null);
   const [employeeForm, setEmployeeForm] = useState({
-    id: '', nombre: '', puesto: 'Sala', roles_adicionales: '', telefono: '', email: '', 
+    id: '', nombre: '', puesto: 'Sala', roles_adicionales: '', dias_permitidos: '0,1,2,3,4,5,6', telefono: '', email: '', 
     horas_semanales: 40, pin: '', nif: '', nass: '', direccion: '', 
     iban: '', fecha_nacimiento: '', fecha_alta: '', tipo_contrato: 'Indefinido', 
     salario_base: 0, vacaciones_totales: 30, dias_libre_disposicion_totales: 2, 
@@ -726,7 +726,7 @@ export default function App() {
                     nextId = `E-${String(maxId + 1).padStart(3, '0')}`;
                   }
                   setEmployeeForm({ 
-                    id: nextId, nombre: '', puesto: 'Sala', roles_adicionales: '', telefono: '', email: '', 
+                    id: nextId, nombre: '', puesto: 'Sala', roles_adicionales: '', dias_permitidos: '0,1,2,3,4,5,6', telefono: '', email: '', 
                     horas_semanales: 40, pin: '', nif: '', nass: '', direccion: '', 
                     iban: '', fecha_nacimiento: '', fecha_alta: '', tipo_contrato: 'Indefinido', 
                     salario_base: 0, vacaciones_totales: 30, dias_libre_disposicion_totales: 2, 
@@ -757,6 +757,19 @@ export default function App() {
                             + {role}
                           </span>
                         ))}
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1 flex items-center gap-1.5">
+                        <span>Disponibilidad: </span>
+                        <span className="text-slate-350">
+                          {(() => {
+                            if (!emp.dias_permitidos) return 'Completa (L-D)';
+                            const days = emp.dias_permitidos.split(',').map(d => parseInt(d.trim()));
+                            if (days.length === 7) return 'Completa (L-D)';
+                            if (days.length === 0) return 'Ninguno (Inactivo)';
+                            const dayNamesShort = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+                            return days.map(d => dayNamesShort[d]).join(', ');
+                          })()}
+                        </span>
                       </div>
                     </div>
                     <span className="font-mono text-xs font-black text-indigo-400 bg-indigo-950/40 border border-indigo-900/50 px-2.5 py-0.5 rounded-full">
@@ -1069,6 +1082,41 @@ export default function App() {
                           </label>
                         );
                       })}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Días de la Semana Habilitados / Disponibles</label>
+                  <div className="flex flex-wrap gap-4 bg-slate-950/20 p-4 rounded-xl border border-slate-800">
+                    {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((dayName, idx) => {
+                      const allowedDaysList = employeeForm.dias_permitidos 
+                        ? employeeForm.dias_permitidos.split(',').map(d => parseInt(d.trim()))
+                        : [0, 1, 2, 3, 4, 5, 6];
+                      const isChecked = allowedDaysList.includes(idx);
+                      return (
+                        <label key={idx} className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-slate-350 select-none">
+                          <input 
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              let newList;
+                              if (e.target.checked) {
+                                newList = [...allowedDaysList, idx];
+                              } else {
+                                newList = allowedDaysList.filter(d => d !== idx);
+                              }
+                              newList.sort((a, b) => a - b);
+                              setEmployeeForm({
+                                ...employeeForm,
+                                dias_permitidos: newList.join(',')
+                              });
+                            }}
+                            className="rounded border-slate-750 bg-slate-900 text-indigo-600 focus:ring-0 cursor-pointer"
+                          />
+                          {dayName}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

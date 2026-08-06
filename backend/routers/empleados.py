@@ -714,8 +714,6 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
             deviation_hours = (actual_minutes - target_minutes) / 60.0
             emp_balancing_bonus[emp.id] = -deviation_hours * 2.0  # Under-contract gets positive bonus
 
-        # To schedule role-specifically, we generate candidates slot-by-slot.
-        # For each slot, candidate pool is active employees matching the slot's role.
         candidate_pools = []
         for slot in slots:
             role_req = slot[3]
@@ -734,11 +732,20 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                     if rp in ["sala", "camarero"] and any(r in ["sala", "camarero"] for r in additional_roles):
                         return True
                 return False
+
+            def esta_disponible_dia(emp: Empleado, wday: int) -> bool:
+                if hasattr(emp, "dias_permitidos") and emp.dias_permitidos is not None:
+                    try:
+                        allowed_days = [int(d.strip()) for d in emp.dias_permitidos.split(",") if d.strip().isdigit()]
+                        if wday not in allowed_days:
+                            return False
+                    except Exception:
+                        pass
+                return True
                 
-            matching_emps = [e for e in employees if puede_cubrir_puesto(e, role_req) and e.estado == "Activo"]
+            matching_emps = [e for e in employees if puede_cubrir_puesto(e, role_req) and e.estado == "Activo" and esta_disponible_dia(e, weekday)]
             # Add None option to represent unassigned/coverage gap
             candidate_pools.append(matching_emps + [None])
-            
         # Cartesian product of candidate pools
         raw_candidates = itertools.product(*candidate_pools)
         candidates = []

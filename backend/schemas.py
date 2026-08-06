@@ -6,6 +6,7 @@ class EmpleadoBase(BaseModel):
     nombre: str
     puesto: str
     roles_adicionales: Optional[str] = None
+    dias_permitidos: Optional[str] = None
     telefono: Optional[str] = None
     email: Optional[str] = None
     horas_semanales: float = 40.0

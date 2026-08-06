@@ -192,3 +192,15 @@ class EmpresaConfigRead(EmpresaConfigBase):
 
 class EmpresaConfigUpdate(EmpresaConfigBase):
     pass
+
+class TurnoConfigBase(BaseModel):
+    id: Optional[int] = None
+    nombre: str
+    hora_inicio: str
+    hora_fin: str
+
+class TurnoConfigCreate(TurnoConfigBase):
+    pass
+
+class TurnoConfigRead(TurnoConfigBase):
+    pass

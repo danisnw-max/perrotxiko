@@ -80,6 +80,8 @@ export default function App() {
     hora_apertura: '09:00', hora_cierre: '00:00'
   });
   const [barHoursType, setBarHoursType] = useState('always');
+  const [turnos, setTurnos] = useState([]);
+  const [turnoForm, setTurnoForm] = useState({ id: null, nombre: '', hora_inicio: '09:00', hora_fin: '16:00' });
 
   // Role Coverages Modal
   const [isRefuerzosModalOpen, setIsRefuerzosModalOpen] = useState(false);
@@ -165,6 +167,9 @@ export default function App() {
 
       const closuresData = await api.get('/configuracion/cierres');
       setCierres(closuresData);
+
+      const turnosData = await api.get('/configuracion/turnos');
+      setTurnos(turnosData);
     } catch (e) {
       console.error(e);
       showToast("Error al cargar configuraciones", "error");
@@ -179,6 +184,12 @@ export default function App() {
   useEffect(() => {
     loadSchedules();
   }, [selectedWeek, scheduleViewMode]);
+
+  useEffect(() => {
+    if (isRefuerzosModalOpen && turnos.length > 0) {
+      setCoverageForm(prev => ({ ...prev, turno: turnos[0].nombre }));
+    }
+  }, [isRefuerzosModalOpen, turnos]);
 
   // Date generators for weekly view
   const getDaysOfWeek = (monStr) => {
@@ -427,6 +438,28 @@ export default function App() {
       loadConfig();
     } catch (e) {
       showToast("Error al eliminar cierre", "error");
+    }
+  };
+
+  const handleSaveTurno = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/configuracion/turnos', turnoForm);
+      showToast("Turno guardado correctamente", "success");
+      setTurnoForm({ id: null, nombre: '', hora_inicio: '09:00', hora_fin: '16:00' });
+      loadConfig();
+    } catch (err) {
+      showToast("Error al guardar turno", "error");
+    }
+  };
+
+  const handleDeleteTurno = async (id) => {
+    try {
+      await api.delete(`/configuracion/turnos/${id}`);
+      showToast("Turno eliminado", "success");
+      loadConfig();
+    } catch (err) {
+      showToast("Error al eliminar turno", "error");
     }
   };
 
@@ -896,6 +929,107 @@ export default function App() {
                   Guardar SMTP
                 </button>
               </form>
+
+              {/* Form 3: Turnos Config */}
+              <div className="p-6 bg-slate-900/40 rounded-[28px] border border-slate-800 space-y-6">
+                <div>
+                  <h3 className="font-bold text-slate-200 text-sm uppercase tracking-wider">Definición de Franjas de Turnos</h3>
+                  <p className="text-[10px] text-slate-550 font-bold uppercase tracking-widest mt-1">Configura las horas de entrada y salida de cada turno laboral</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column: List Turnos */}
+                  <div className="space-y-3">
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Turnos Definidos</label>
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2">
+                      {turnos.map(t => (
+                        <div key={t.id} className="p-3 bg-slate-850 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                          <div>
+                            <span className="font-bold text-slate-200">{t.nombre}</span>
+                            <span className="font-mono text-slate-400 ml-2">({t.hora_inicio} - {t.hora_fin})</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              type="button" 
+                              onClick={() => setTurnoForm(t)}
+                              className="text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer"
+                            >
+                              Editar
+                            </button>
+                            <button 
+                              type="button" 
+                              onClick={() => handleDeleteTurno(t.id)}
+                              className="text-slate-500 hover:text-rose-400 cursor-pointer"
+                            >
+                              <Trash2 size={12}/>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {turnos.length === 0 && (
+                        <p className="text-xs text-slate-500 italic py-6">Sin turnos definidos. Crea uno a la derecha.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Add/Edit Turno Form */}
+                  <form onSubmit={handleSaveTurno} className="space-y-4 bg-slate-950/20 p-4 rounded-xl border border-slate-800 text-left">
+                    <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider pb-1 border-b border-slate-850">
+                      {turnoForm.id ? 'Editar Franja' : 'Añadir Franja'}
+                    </h4>
+
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-450 uppercase tracking-widest mb-1">Nombre del Turno</label>
+                      <input 
+                        type="text" 
+                        placeholder="Ej. Mañana, Tarde, Refuerzo"
+                        value={turnoForm.nombre} 
+                        onChange={e => setTurnoForm({...turnoForm, nombre: e.target.value})} 
+                        className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-xs font-bold text-slate-200 outline-none" 
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[9px] font-black text-slate-455 uppercase tracking-widest mb-1">Hora Inicio</label>
+                        <input 
+                          type="time" 
+                          value={turnoForm.hora_inicio} 
+                          onChange={e => setTurnoForm({...turnoForm, hora_inicio: e.target.value})} 
+                          className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-black text-slate-455 uppercase tracking-widest mb-1">Hora Fin</label>
+                        <input 
+                          type="time" 
+                          value={turnoForm.hora_fin} 
+                          onChange={e => setTurnoForm({...turnoForm, hora_fin: e.target.value})} 
+                          className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button type="submit" className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer">
+                        {turnoForm.id ? 'Guardar Cambios' : 'Crear Turno'}
+                      </button>
+                      {turnoForm.id && (
+                        <button 
+                          type="button" 
+                          onClick={() => setTurnoForm({ id: null, nombre: '', hora_inicio: '09:00', hora_fin: '16:00' })}
+                          className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </div>
+              </div>
 
             </div>
           </div>
@@ -1642,9 +1776,16 @@ export default function App() {
               <div>
                 <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Turno del Bar</label>
                 <select value={coverageForm.turno} onChange={e => setCoverageForm({...coverageForm, turno: e.target.value})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none">
-                  <option value="Mañana">Mañana</option>
-                  <option value="Tarde">Tarde</option>
-                  <option value="Noche">Noche</option>
+                  {turnos.map(t => (
+                    <option key={t.id} value={t.nombre}>{t.nombre} ({t.hora_inicio} - {t.hora_fin})</option>
+                  ))}
+                  {turnos.length === 0 && (
+                    <>
+                      <option value="Mañana">Mañana</option>
+                      <option value="Tarde">Tarde</option>
+                      <option value="Noche">Noche</option>
+                    </>
+                  )}
                 </select>
               </div>
 

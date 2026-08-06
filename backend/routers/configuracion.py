@@ -8,14 +8,16 @@ from models import (
     Festivo,
     CierreBar,
     EmpresaConfig,
-    SMTPConfig
+    SMTPConfig,
+    TurnoConfig
 )
 from schemas import (
     HorarioBarRead,
     CoberturaRequeridaRead,
     FestivoRead,
     EmpresaConfigRead,
-    SMTPConfigRead
+    SMTPConfigRead,
+    TurnoConfigRead
 )
 
 router = APIRouter(tags=["configuracion"])
@@ -54,6 +56,40 @@ def delete_horario_bar(id: int, session: Session = Depends(get_session)):
     session.delete(db_hb)
     session.commit()
     return {"detail": "Horario eliminado correctamente"}
+
+
+# === GESTIÓN DE TURNOS (FRANJAS HORARIAS) ===
+@router.get("/api/configuracion/turnos", response_model=List[TurnoConfigRead])
+def get_turnos(session: Session = Depends(get_session)):
+    return session.exec(select(TurnoConfig).order_by(TurnoConfig.nombre)).all()
+
+@router.post("/api/configuracion/turnos", response_model=TurnoConfigRead)
+def save_turno(turno: TurnoConfig, session: Session = Depends(get_session)):
+    if turno.id:
+        db_turno = session.get(TurnoConfig, turno.id)
+        if db_turno:
+            db_turno.nombre = turno.nombre
+            db_turno.hora_inicio = turno.hora_inicio
+            db_turno.hora_fin = turno.hora_fin
+            session.add(db_turno)
+            session.commit()
+            session.refresh(db_turno)
+            return db_turno
+            
+    session.add(turno)
+    session.commit()
+    session.refresh(turno)
+    return turno
+
+@router.delete("/api/configuracion/turnos/{id}")
+def delete_turno(id: int, session: Session = Depends(get_session)):
+    db_turno = session.get(TurnoConfig, id)
+    if not db_turno:
+        raise HTTPException(status_code=404, detail="Turno no encontrado")
+    session.delete(db_turno)
+    session.commit()
+    return {"detail": "Turno eliminado correctamente"}
+
 
 
 # === COBERTURAS REQUERIDAS POR ROL ===

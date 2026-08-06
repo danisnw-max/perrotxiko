@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 from database import engine, create_db_and_tables
-from models import Empleado, HorarioBar, CoberturaRequerida, EmpresaConfig
+from models import Empleado, HorarioBar, CoberturaRequerida, EmpresaConfig, TurnoConfig
 from routers.empleados import router as empleados_router
 from routers.incidencias import router as incidencias_router
 from routers.presencia import router as presencia_router
@@ -110,6 +110,14 @@ def seed_database(session: Session):
 
         session.commit()
         print("Default CoberturaRequerida seeded!")
+
+    # 5. Seed Default TurnoConfig
+    if session.exec(select(TurnoConfig)).first() is None:
+        session.add(TurnoConfig(nombre="Mañana", hora_inicio="09:00", hora_fin="16:00"))
+        session.add(TurnoConfig(nombre="Tarde", hora_inicio="16:00", hora_fin="00:00"))
+        session.add(TurnoConfig(nombre="Noche", hora_inicio="18:00", hora_fin="02:00"))
+        session.commit()
+        print("Default TurnoConfig seeded!")
 
 @app.on_event("startup")
 async def on_startup():

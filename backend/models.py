@@ -129,3 +129,9 @@ class EmpresaConfig(SQLModel, table=True):
     direccion: str = Field(default="C/ Mayor 12, San Sebastián")
     telefono: str = Field(default="943 12 34 56")
     email: str = Field(default="info@aterpebar.com")
+
+class TurnoConfig(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nombre: str = Field(index=True)  # Ej. "Mañana", "Tarde", "Noche"
+    hora_inicio: str  # HH:MM
+    hora_fin: str  # HH:MM

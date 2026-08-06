@@ -5,7 +5,7 @@ from sqlmodel import Session, SQLModel, create_engine, select
 # Add current folder to path
 sys.path.append(os.path.dirname(__file__))
 
-from models import Empleado, HorarioBar, CoberturaRequerida, HorarioTrabajador, RegistroFichaje
+from models import Empleado, HorarioBar, CoberturaRequerida, HorarioTrabajador, RegistroFichaje, TurnoConfig
 from database import get_session
 
 def test_database_creation_and_seeding():
@@ -58,6 +58,18 @@ def test_database_creation_and_seeding():
         assert db_hb.hora_apertura == "09:00"
         assert db_hb.hora_cierre == "00:00"
         print("[Test] Opening Hours model verified!")
+
+        # Test TurnoConfig CRUD
+        tc = TurnoConfig(nombre="Refuerzo", hora_inicio="13:00", hora_fin="17:00")
+        session.add(tc)
+        session.commit()
+        session.refresh(tc)
+        db_tc = session.get(TurnoConfig, tc.id)
+        assert db_tc is not None
+        assert db_tc.nombre == "Refuerzo"
+        assert db_tc.hora_inicio == "13:00"
+        assert db_tc.hora_fin == "17:00"
+        print("[Test] TurnoConfig model verified!")
 
         # Test worked hours calculations
         from routers.presencia import calculate_working_hours

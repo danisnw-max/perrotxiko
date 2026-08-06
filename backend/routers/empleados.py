@@ -19,7 +19,8 @@ from models import (
     CoberturaRequerida,
     Festivo,
     CierreBar,
-    SMTPConfig
+    SMTPConfig,
+    TurnoConfig
 )
 from schemas import (
     EmpleadoRead,
@@ -465,6 +466,10 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
     # Get Bar hours
     bar_hours_list = session.exec(select(HorarioBar)).all()
     
+    # Get TurnoConfig
+    turnos_list = session.exec(select(TurnoConfig)).all()
+    turnos_map = {t.nombre.lower(): (t.hora_inicio, t.hora_fin) for t in turnos_list}
+    
     # Get Coverage rules
     coberturas_list = session.exec(select(CoberturaRequerida)).all()
     
@@ -712,21 +717,34 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         slots = []
         # Fallback default coverages if none configured in DB
         if not day_coberturas:
-            if m_start and m_end:
-                slots.append(("Mañana", m_start, m_end, "Cocinero", 0, None))
-                slots.append(("Mañana", m_start, m_end, "Sala", 0, None))
-            if t_start and t_end:
-                slots.append(("Tarde", t_start, t_end, "Cocinero", 0, None))
-                slots.append(("Tarde", t_start, t_end, "Sala", 0, None))
-                slots.append(("Tarde", t_start, t_end, "Sala", 1, None))
+            m_s = turnos_map.get("mañana", (m_start, m_end))[0]
+            m_e = turnos_map.get("mañana", (m_start, m_end))[1]
+            t_s = turnos_map.get("tarde", (t_start, t_end))[0]
+            t_e = turnos_map.get("tarde", (t_start, t_end))[1]
+            
+            if m_s and m_e:
+                slots.append(("Mañana", m_s, m_e, "Cocinero", 0, None))
+                slots.append(("Mañana", m_s, m_e, "Sala", 0, None))
+            if t_s and t_e:
+                slots.append(("Tarde", t_s, t_e, "Cocinero", 0, None))
+                slots.append(("Tarde", t_s, t_e, "Sala", 0, None))
+                slots.append(("Tarde", t_s, t_e, "Sala", 1, None))
         else:
             for cob in day_coberturas:
-                if cob.turno == "Mañana" and m_start and m_end:
+                c_name = cob.turno.lower()
+                c_hours = turnos_map.get(c_name, None)
+                if c_hours:
+                    c_s, c_e = c_hours
+                else:
+                    # Fallback to commercial hours splitter
+                    if cob.turno == "Mañana":
+                        c_s, c_e = m_start, m_end
+                    else:
+                        c_s, c_e = t_start, t_end
+                        
+                if c_s and c_e:
                     for idx in range(cob.cantidad):
-                        slots.append(("Mañana", m_start, m_end, cob.puesto, idx, cob.descripcion))
-                elif cob.turno in ["Tarde", "Noche"] and t_start and t_end:
-                    for idx in range(cob.cantidad):
-                        slots.append((cob.turno, t_start, t_end, cob.puesto, idx, cob.descripcion))
+                        slots.append((cob.turno, c_s, c_e, cob.puesto, idx, cob.descripcion))
         
         if not slots:
             continue

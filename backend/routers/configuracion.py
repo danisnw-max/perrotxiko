@@ -154,20 +154,33 @@ def get_coberturas(temporada_id: int = None, session: Session = Depends(get_sess
 
 @router.post("/api/configuracion/coberturas", response_model=CoberturaRequeridaRead)
 def save_cobertura(cob: CoberturaRequerida, session: Session = Depends(get_session)):
+    db_cob = None
     if cob.id:
         db_cob = session.get(CoberturaRequerida, cob.id)
-        if db_cob:
-            db_cob.temporada_id = cob.temporada_id
-            db_cob.dia_semana = cob.dia_semana
-            db_cob.fecha = cob.fecha
-            db_cob.turno = cob.turno
-            db_cob.puesto = cob.puesto
-            db_cob.cantidad = cob.cantidad
-            db_cob.descripcion = cob.descripcion
-            session.add(db_cob)
-            session.commit()
-            session.refresh(db_cob)
-            return db_cob
+    else:
+        q = select(CoberturaRequerida).where(
+            CoberturaRequerida.temporada_id == cob.temporada_id,
+            CoberturaRequerida.turno == cob.turno,
+            CoberturaRequerida.puesto == cob.puesto
+        )
+        if cob.fecha:
+            q = q.where(CoberturaRequerida.fecha == cob.fecha)
+        else:
+            q = q.where(CoberturaRequerida.dia_semana == cob.dia_semana)
+        db_cob = session.exec(q).first()
+
+    if db_cob:
+        db_cob.temporada_id = cob.temporada_id
+        db_cob.dia_semana = cob.dia_semana
+        db_cob.fecha = cob.fecha
+        db_cob.turno = cob.turno
+        db_cob.puesto = cob.puesto
+        db_cob.cantidad = cob.cantidad
+        db_cob.descripcion = cob.descripcion
+        session.add(db_cob)
+        session.commit()
+        session.refresh(db_cob)
+        return db_cob
             
     session.add(cob)
     session.commit()

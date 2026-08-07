@@ -1091,11 +1091,29 @@ export default function App() {
                     setIsStoreHoursModalOpen(true);
                   }}
                   onAddTurnoToDay={(dayId, existingTurnoNombre) => {
-                    setCoverageForm(prev => ({
-                      ...prev,
+                    const newCantidades = { Sala: 0, Barra: 0, Cocinero: 0, Encargado: 0, Limpieza: 0 };
+                    let descripcion = '';
+                    if (existingTurnoNombre) {
+                      const existingCobs = coberturas.filter(c => c.dia_semana === dayId && c.turno === existingTurnoNombre && !c.fecha);
+                      existingCobs.forEach(c => {
+                        newCantidades[c.puesto] = c.cantidad;
+                        if (c.descripcion) descripcion = c.descripcion;
+                      });
+                    } else {
+                      newCantidades.Sala = 1;
+                      newCantidades.Barra = 1;
+                      newCantidades.Cocinero = 1;
+                      newCantidades.Encargado = 1;
+                    }
+
+                    setCoverageForm({
+                      id: null,
                       dias_semana: [dayId],
-                      turno: existingTurnoNombre || (turnos.length > 0 ? turnos[0].nombre : 'Mañana')
-                    }));
+                      fecha: '',
+                      turno: existingTurnoNombre || (turnos.length > 0 ? turnos[0].nombre : 'Mañana'),
+                      cantidades: newCantidades,
+                      descripcion: descripcion
+                    });
                     setCoverageType('weekday');
                     setIsRefuerzosModalOpen(true);
                   }}

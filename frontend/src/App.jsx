@@ -439,7 +439,7 @@ export default function App() {
       }
       showToast("Reglas de cobertura guardadas", "success");
       setCoverageForm({ id: null, dias_semana: [0], fecha: '', turno: turnos.length > 0 ? turnos[0].nombre : 'Mañana', cantidades: { Sala: 1, Barra: 1, Cocinero: 1, Encargado: 1, Limpieza: 0 }, descripcion: '' });
-      loadConfig();
+      loadConfigForTemporada(activeTemporadaId);
     } catch (err) {
       showToast("Error al guardar coberturas", "error");
     }
@@ -449,7 +449,7 @@ export default function App() {
     try {
       await api.delete(`/configuracion/coberturas/${id}`);
       showToast("Regla de cobertura eliminada", "success");
-      loadConfig();
+      loadConfigForTemporada(activeTemporadaId);
     } catch (e) {
       showToast("Error al eliminar cobertura", "error");
     }
@@ -507,7 +507,7 @@ export default function App() {
       await api.post('/configuracion/turnos', { ...turnoForm, temporada_id: activeTemporadaId });
       showToast("Turno guardado correctamente", "success");
       setTurnoForm({ id: null, nombre: '', hora_inicio: '09:00', hora_fin: '16:00' });
-      loadConfig();
+      loadConfigForTemporada(activeTemporadaId);
     } catch (err) {
       showToast("Error al guardar turno", "error");
     }
@@ -517,7 +517,7 @@ export default function App() {
     try {
       await api.delete(`/configuracion/turnos/${id}`);
       showToast("Turno eliminado", "success");
-      loadConfig();
+      loadConfigForTemporada(activeTemporadaId);
     } catch (err) {
       showToast("Error al eliminar turno", "error");
     }
@@ -554,7 +554,7 @@ export default function App() {
         id: null, dias_semana: [], desde: '', hasta: '', abierto: true,
         hora_apertura: '09:00', hora_cierre: '00:00'
       });
-      loadConfig();
+      loadConfigForTemporada(activeTemporadaId);
     } catch (err) {
       showToast("Error al guardar horario del bar", "error");
     }
@@ -565,7 +565,7 @@ export default function App() {
     try {
       await api.delete(`/configuracion/horario-bar/${id}`);
       showToast("Horario comercial eliminado", "success");
-      loadConfig();
+      loadConfigForTemporada(activeTemporadaId);
     } catch (e) {
       showToast("Error al eliminar horario", "error");
     }

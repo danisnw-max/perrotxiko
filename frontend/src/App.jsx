@@ -1070,6 +1070,10 @@ export default function App() {
                   storeHours={storeHours}
                   turnos={turnos}
                   coberturas={coberturas}
+                  onAddGlobalHours={() => {
+                    setBarHoursForm({ id: null, dias_semana: [], abierto: true, hora_apertura: '09:00', hora_cierre: '00:00' });
+                    setIsStoreHoursModalOpen(true);
+                  }}
                   onEditDayHours={(dayId, currentHours) => {
                     setBarHoursForm({ ...currentHours, dias_semana: [dayId] });
                     setIsStoreHoursModalOpen(true);

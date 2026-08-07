@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, CalendarDays, Clock, Settings, FileText, 
   CalendarRange, Plus, ShieldAlert, CheckCircle, Mail, MapPin, 
-  Phone, Briefcase, PlusCircle, AlertCircle, Trash2, X
+  Phone, Briefcase, PlusCircle, AlertCircle, Trash2, X, Edit2
 } from 'lucide-react';
 import { api } from './services/api';
 

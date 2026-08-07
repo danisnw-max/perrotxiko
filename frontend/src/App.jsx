@@ -455,6 +455,18 @@ export default function App() {
     }
   };
 
+  const handleDeleteFranjaDay = async (dia_semana, turno_nombre) => {
+    if (!window.confirm(`¿Seguro que deseas eliminar la franja "${turno_nombre}" para este día?`)) return;
+    try {
+      const coberturasToDelete = coberturas.filter(c => c.dia_semana === dia_semana && c.turno === turno_nombre && !c.fecha);
+      await Promise.all(coberturasToDelete.map(c => api.delete(`/configuracion/coberturas/${c.id}`)));
+      showToast("Franja eliminada", "success");
+      loadConfigForTemporada(activeTemporadaId);
+    } catch (e) {
+      showToast("Error al eliminar la franja", "error");
+    }
+  };
+
   // Holidays handlers
   const handleSaveFestivo = async (e) => {
     e.preventDefault();
@@ -1087,6 +1099,7 @@ export default function App() {
                     setCoverageType('weekday');
                     setIsRefuerzosModalOpen(true);
                   }}
+                  onDeleteFranjaDay={handleDeleteFranjaDay}
                 />
               </div>
 

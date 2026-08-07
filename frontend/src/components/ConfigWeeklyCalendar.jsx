@@ -11,7 +11,8 @@ export default function ConfigWeeklyCalendar({
   onEditCobertura,
   onDeleteCobertura,
   onDeleteTurno,
-  onAddGlobalHours
+  onAddGlobalHours,
+  onDeleteFranjaDay
 }) {
   const days = [
     { id: 0, name: 'Lunes', short: 'LUN' },
@@ -106,9 +107,14 @@ export default function ConfigWeeklyCalendar({
                         <div className="text-[10px] font-black text-slate-200 uppercase tracking-wider">{t.nombre}</div>
                         <div className="text-[9px] font-mono text-slate-400">{t.hora_inicio} - {t.hora_fin}</div>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); onAddTurnoToDay(day.id, t.nombre); }} className="text-slate-500 hover:text-indigo-400">
-                        <Edit2 size={10} />
-                      </button>
+                      <div className="flex gap-1">
+                        <button onClick={(e) => { e.stopPropagation(); onAddTurnoToDay(day.id, t.nombre); }} className="text-slate-500 hover:text-indigo-400">
+                          <Edit2 size={10} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); onDeleteFranjaDay(day.id, t.nombre); }} className="text-slate-500 hover:text-rose-400">
+                          <Trash2 size={10} />
+                        </button>
+                      </div>
                     </div>
                     
                     <div className="space-y-1 mt-2">

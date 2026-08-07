@@ -13,11 +13,9 @@ const SchedulerTab = ({
   setEmployeeForm,
   setEditingEmployeeId,
   setIsEmployeeModalOpen,
-  setIsStoreHoursModalOpen,
   fetchFestivos,
   setIsFestivosModalOpen,
   setIsCierresTiendaModalOpen,
-  setIsRefuerzosModalOpen,
   getWeeklyHoursSummary,
   setSelectedPrefsEmployee,
   fetchEmployeeRestrictions,
@@ -62,19 +60,6 @@ const SchedulerTab = ({
           </button>
           
 
-          <button 
-            onClick={() => setIsStoreHoursModalOpen(true)} 
-            className="py-2.5 px-4.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-350 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
-          >
-            <Clock size={14} className="mr-1.5 text-slate-400"/> Horario Bar
-          </button>
-
-          <button 
-            onClick={() => setIsRefuerzosModalOpen(true)} 
-            className="py-2.5 px-4.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-350 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
-          >
-            <Users size={14} className="mr-1.5 text-indigo-400"/> Cobertura Puestos
-          </button>
 
           <button 
             onClick={() => { fetchFestivos(); setIsFestivosModalOpen(true); }} 

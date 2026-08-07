@@ -823,11 +823,9 @@ export default function App() {
             setEmployeeForm={setEmployeeForm}
             setEditingEmployeeId={setEditingEmployeeId}
             setIsEmployeeModalOpen={setIsEmployeeModalOpen}
-            setIsStoreHoursModalOpen={setIsStoreHoursModalOpen}
             fetchFestivos={loadConfig}
             setIsFestivosModalOpen={setIsFestivosModalOpen}
             setIsCierresTiendaModalOpen={setIsCierresTiendaModalOpen}
-            setIsRefuerzosModalOpen={setIsRefuerzosModalOpen}
             getWeeklyHoursSummary={getWeeklyHoursSummary}
             setSelectedPrefsEmployee={setSelectedPrefsEmployee}
             fetchEmployeeRestrictions={fetchEmployeeRestrictions}

@@ -89,6 +89,7 @@ export default function App() {
   const [barHoursType, setBarHoursType] = useState('always');
   const [turnos, setTurnos] = useState([]);
   const [turnoForm, setTurnoForm] = useState({ id: null, nombre: '', hora_inicio: '09:00', hora_fin: '16:00' });
+  const [isTurnosModalOpen, setIsTurnosModalOpen] = useState(false);
 
   // Role Coverages Modal
   const [isRefuerzosModalOpen, setIsRefuerzosModalOpen] = useState(false);
@@ -1131,6 +1132,7 @@ export default function App() {
                     setIsRefuerzosModalOpen(true);
                   }}
                   onDeleteFranjaDay={handleDeleteFranjaDay}
+                  onManageTurnos={() => setIsTurnosModalOpen(true)}
                 />
               </div>
 
@@ -2116,6 +2118,86 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* 14. Turnos Management Modal */}
+      {isTurnosModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-3xl w-full flex flex-col md:flex-row gap-6 max-h-[85vh] text-left">
+            
+            <div className="w-full md:w-1/2 flex flex-col overflow-y-auto pr-2">
+              <h3 className="text-lg font-black text-slate-100 tracking-tight mb-2">Turnos Globales</h3>
+              <p className="text-[10px] text-slate-500 leading-relaxed mb-4">
+                Define los turnos (franjas horarias) disponibles para configurar las necesidades de personal en esta temporada.
+              </p>
+              
+              <div className="space-y-2 flex-1">
+                {turnos.map(t => (
+                  <div key={t.id} className="p-3 bg-slate-850 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                    <div>
+                      <div className="font-bold text-slate-200">{t.nombre}</div>
+                      <p className="text-slate-400 mt-1 font-mono text-[10px]">
+                        {t.hora_inicio} - {t.hora_fin}
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => setTurnoForm(t)} className="p-1 hover:text-indigo-400 text-slate-500 transition-colors cursor-pointer">
+                        <Edit2 size={12}/>
+                      </button>
+                      <button onClick={() => handleDeleteTurno(t.id)} className="p-1 hover:text-rose-400 text-slate-500 transition-colors cursor-pointer">
+                        <Trash2 size={12}/>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {turnos.length === 0 && (
+                  <p className="text-[10px] text-slate-600 font-bold italic text-center py-4">No hay turnos creados.</p>
+                )}
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveTurno} className="w-full md:w-1/2 space-y-4 bg-slate-950/20 p-5 rounded-2xl border border-slate-800 text-left flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-850">
+                  <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
+                    {turnoForm.id ? 'Editar Turno' : 'Añadir Turno'}
+                  </h4>
+                  {turnoForm.id && (
+                    <button type="button" onClick={() => setTurnoForm({ id: null, nombre: '', hora_inicio: '09:00', hora_fin: '16:00' })} className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:underline cursor-pointer">
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nombre del Turno</label>
+                  <input type="text" placeholder="Ej. Mañana, Comidas, Tarde..." value={turnoForm.nombre} onChange={e => setTurnoForm({...turnoForm, nombre: e.target.value})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none" required />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Hora Inicio</label>
+                    <input type="time" value={turnoForm.hora_inicio} onChange={e => setTurnoForm({...turnoForm, hora_inicio: e.target.value})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" required />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Hora Fin</label>
+                    <input type="time" value={turnoForm.hora_fin} onChange={e => setTurnoForm({...turnoForm, hora_fin: e.target.value})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" required />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4 border-t border-slate-800">
+                <button type="submit" className="flex-1 py-3 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center transition-all cursor-pointer">
+                  Guardar
+                </button>
+                <button type="button" onClick={() => setIsTurnosModalOpen(false)} className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-700 cursor-pointer">
+                  Cerrar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

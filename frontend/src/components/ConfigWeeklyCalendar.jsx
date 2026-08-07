@@ -12,7 +12,8 @@ export default function ConfigWeeklyCalendar({
   onDeleteCobertura,
   onDeleteTurno,
   onAddGlobalHours,
-  onDeleteFranjaDay
+  onDeleteFranjaDay,
+  onManageTurnos
 }) {
   const days = [
     { id: 0, name: 'Lunes', short: 'LUN' },
@@ -42,12 +43,20 @@ export default function ConfigWeeklyCalendar({
             Gestiona los horarios de apertura y los turnos de personal para cada día
           </p>
         </div>
-        <button 
-          onClick={onAddGlobalHours}
-          className="flex items-center gap-1.5 py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all"
-        >
-          <Clock size={12} /> Añadir Horarios (Varios días)
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={onManageTurnos}
+            className="flex items-center gap-1.5 py-2 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-700 transition-all"
+          >
+            Gestionar Turnos Base
+          </button>
+          <button 
+            onClick={onAddGlobalHours}
+            className="flex items-center gap-1.5 py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all"
+          >
+            <Clock size={12} /> Añadir Horarios (Varios días)
+          </button>
+        </div>
       </div>
 
       {/* Grid */}

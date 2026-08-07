@@ -83,7 +83,7 @@ export default function App() {
   const [isStoreHoursModalOpen, setIsStoreHoursModalOpen] = useState(false);
   const [editingStoreHours, setEditingStoreHours] = useState([]);
   const [barHoursForm, setBarHoursForm] = useState({
-    id: null, dia_semana: 0, desde: '', hasta: '', abierto: true,
+    id: null, dias_semana: [], desde: '', hasta: '', abierto: true,
     hora_apertura: '09:00', hora_cierre: '00:00'
   });
   const [barHoursType, setBarHoursType] = useState('always');
@@ -527,16 +527,31 @@ export default function App() {
   const handleSaveStoreHours = async (e) => {
     e.preventDefault();
     try {
-      const payload = {
+      if (!barHoursForm.dias_semana || barHoursForm.dias_semana.length === 0) {
+        showToast("Selecciona al menos un día", "error");
+        return;
+      }
+      
+      const payloadBase = {
         ...barHoursForm,
         temporada_id: activeTemporadaId,
         hora_apertura: barHoursForm.abierto ? barHoursForm.hora_apertura : null,
         hora_cierre: barHoursForm.abierto ? barHoursForm.hora_cierre : null
       };
-      await api.post('/configuracion/horario-bar', payload);
+
+      // Si es una edición de un registro existente, solo guardamos ese
+      if (barHoursForm.id) {
+        await api.post('/configuracion/horario-bar', { ...payloadBase, dia_semana: barHoursForm.dias_semana[0] });
+      } else {
+        // Si es nuevo, creamos uno por cada día seleccionado
+        await Promise.all(barHoursForm.dias_semana.map(d => 
+          api.post('/configuracion/horario-bar', { ...payloadBase, dia_semana: d })
+        ));
+      }
+
       showToast("Horario comercial guardado", "success");
       setBarHoursForm({
-        id: null, dia_semana: 0, desde: '', hasta: '', abierto: true,
+        id: null, dias_semana: [], desde: '', hasta: '', abierto: true,
         hora_apertura: '09:00', hora_cierre: '00:00'
       });
       loadConfig();
@@ -1058,7 +1073,7 @@ export default function App() {
                   turnos={turnos}
                   coberturas={coberturas}
                   onEditDayHours={(dayId, currentHours) => {
-                    setBarHoursForm({ ...currentHours, dia_semana: dayId });
+                    setBarHoursForm({ ...currentHours, dias_semana: [dayId] });
                     setIsStoreHoursModalOpen(true);
                   }}
                   onAddTurnoToDay={(dayId, existingTurnoNombre) => {
@@ -1560,7 +1575,7 @@ export default function App() {
                       </button>
                       <button 
                         type="button" 
-                        onClick={() => setBarHoursForm({ id: null, dia_semana: 0, abierto: true, hora_apertura: '09:00', hora_cierre: '00:00' })}
+                        onClick={() => setBarHoursForm({ id: null, dias_semana: [], abierto: true, hora_apertura: '09:00', hora_cierre: '00:00' })}
                         className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:underline cursor-pointer"
                       >
                         Limpiar / Nuevo
@@ -1570,16 +1585,37 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Día de la Semana</label>
-                  <select 
-                    value={barHoursForm.dia_semana} 
-                    onChange={e => setBarHoursForm({...barHoursForm, dia_semana: parseInt(e.target.value)})} 
-                    className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none"
-                  >
-                    {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((dayName, idx) => (
-                      <option key={idx} value={idx}>{dayName}</option>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Días de la Semana</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((dayChar, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          const currentDays = barHoursForm.dias_semana || [];
+                          if (currentDays.includes(idx)) {
+                            if (currentDays.length > 1) {
+                              setBarHoursForm({...barHoursForm, dias_semana: currentDays.filter(d => d !== idx)});
+                            }
+                          } else {
+                            // Si estamos editando uno ya creado (tiene id), no permitimos seleccionar varios
+                            if (barHoursForm.id) {
+                              setBarHoursForm({...barHoursForm, dias_semana: [idx]});
+                            } else {
+                              setBarHoursForm({...barHoursForm, dias_semana: [...currentDays, idx]});
+                            }
+                          }
+                        }}
+                        className={`w-9 h-9 flex items-center justify-center rounded-lg text-xs font-black transition-all border cursor-pointer ${
+                          (barHoursForm.dias_semana || []).includes(idx) 
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/50' 
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750'
+                        }`}
+                      >
+                        {dayChar}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2 py-2">

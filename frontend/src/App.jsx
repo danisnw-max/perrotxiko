@@ -406,39 +406,51 @@ export default function App() {
   const handleSaveCoverage = async (e) => {
     e.preventDefault();
     try {
+      // If turno changed, delete the old turno's records for these days
+      if (coverageForm.oldTurno && coverageForm.oldTurno !== coverageForm.turno) {
+        const daysToClean = coverageType === 'weekday' ? coverageForm.dias_semana : [];
+        if (daysToClean.length > 0) {
+          const cobsToDelete = coberturas.filter(c => 
+            daysToClean.includes(c.dia_semana) && 
+            c.turno === coverageForm.oldTurno && 
+            !c.fecha
+          );
+          await Promise.all(cobsToDelete.map(c => api.delete(`/configuracion/coberturas/${c.id}`)));
+        }
+      }
+
       const puestos = ['Sala', 'Barra', 'Cocinero', 'Encargado', 'Limpieza'];
       for (const p of puestos) {
         const cant = coverageForm.cantidades[p];
-        if (cant > 0) {
-          if (coverageType === 'weekday') {
-            for (const dia of coverageForm.dias_semana) {
-              const payload = {
-                temporada_id: activeTemporadaId,
-                dia_semana: dia,
-                fecha: null,
-                descripcion: null,
-                turno: coverageForm.turno,
-                puesto: p,
-                cantidad: cant
-              };
-              await api.post('/configuracion/coberturas', payload);
-            }
-          } else {
+        // Send even if cant is 0, so backend can delete it
+        if (coverageType === 'weekday') {
+          for (const dia of coverageForm.dias_semana) {
             const payload = {
               temporada_id: activeTemporadaId,
-              dia_semana: null,
-              fecha: coverageForm.fecha,
-              descripcion: coverageForm.descripcion,
+              dia_semana: dia,
+              fecha: null,
+              descripcion: null,
               turno: coverageForm.turno,
               puesto: p,
               cantidad: cant
             };
             await api.post('/configuracion/coberturas', payload);
           }
+        } else {
+          const payload = {
+            temporada_id: activeTemporadaId,
+            dia_semana: null,
+            fecha: coverageForm.fecha,
+            descripcion: coverageForm.descripcion,
+            turno: coverageForm.turno,
+            puesto: p,
+            cantidad: cant
+          };
+          await api.post('/configuracion/coberturas', payload);
         }
       }
       showToast("Reglas de cobertura guardadas", "success");
-      setCoverageForm({ id: null, dias_semana: [0], fecha: '', turno: turnos.length > 0 ? turnos[0].nombre : 'Mañana', cantidades: { Sala: 1, Barra: 1, Cocinero: 1, Encargado: 1, Limpieza: 0 }, descripcion: '' });
+      setCoverageForm({ id: null, oldTurno: null, dias_semana: [0], fecha: '', turno: turnos.length > 0 ? turnos[0].nombre : 'Mañana', cantidades: { Sala: 1, Barra: 1, Cocinero: 1, Encargado: 1, Limpieza: 0 }, descripcion: '' });
       loadConfigForTemporada(activeTemporadaId);
     } catch (err) {
       showToast("Error al guardar coberturas", "error");
@@ -1108,6 +1120,7 @@ export default function App() {
 
                     setCoverageForm({
                       id: null,
+                      oldTurno: existingTurnoNombre || null,
                       dias_semana: [dayId],
                       fecha: '',
                       turno: existingTurnoNombre || (turnos.length > 0 ? turnos[0].nombre : 'Mañana'),

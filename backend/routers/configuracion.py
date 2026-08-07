@@ -170,6 +170,11 @@ def save_cobertura(cob: CoberturaRequerida, session: Session = Depends(get_sessi
         db_cob = session.exec(q).first()
 
     if db_cob:
+        if cob.cantidad == 0:
+            session.delete(db_cob)
+            session.commit()
+            return db_cob
+
         db_cob.temporada_id = cob.temporada_id
         db_cob.dia_semana = cob.dia_semana
         db_cob.fecha = cob.fecha
@@ -182,9 +187,10 @@ def save_cobertura(cob: CoberturaRequerida, session: Session = Depends(get_sessi
         session.refresh(db_cob)
         return db_cob
             
-    session.add(cob)
-    session.commit()
-    session.refresh(cob)
+    if cob.cantidad > 0:
+        session.add(cob)
+        session.commit()
+        session.refresh(cob)
     return cob
 
 @router.delete("/api/configuracion/coberturas/{id}")

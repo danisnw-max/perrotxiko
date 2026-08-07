@@ -20,7 +20,8 @@ from models import (
     Festivo,
     CierreBar,
     SMTPConfig,
-    TurnoConfig
+    TurnoConfig,
+    Temporada
 )
 from schemas import (
     EmpleadoRead,
@@ -463,15 +464,33 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
             session.delete(s)
     session.commit()
     
+    # Fetch seasons
+    temporadas = session.exec(select(Temporada)).all()
+    default_temp = next((t for t in temporadas if t.es_defecto), None)
+    if not default_temp and temporadas:
+        default_temp = temporadas[0]
+        
+    def get_temporada_id_for_date(d_str):
+        d_val = d_str[5:] # MM-DD
+        for t in temporadas:
+            if not t.es_defecto and t.fecha_inicio and t.fecha_fin:
+                if t.fecha_inicio <= t.fecha_fin:
+                    if t.fecha_inicio <= d_val <= t.fecha_fin:
+                        return t.id
+                else:
+                    # spans over year end (e.g. 11-01 to 02-28)
+                    if d_val >= t.fecha_inicio or d_val <= t.fecha_fin:
+                        return t.id
+        return default_temp.id if default_temp else None
+
     # Get Bar hours
-    bar_hours_list = session.exec(select(HorarioBar)).all()
+    all_bar_hours = session.exec(select(HorarioBar)).all()
     
     # Get TurnoConfig
-    turnos_list = session.exec(select(TurnoConfig)).all()
-    turnos_map = {t.nombre.lower(): (t.hora_inicio, t.hora_fin) for t in turnos_list}
+    all_turnos = session.exec(select(TurnoConfig)).all()
     
     # Get Coverage rules
-    coberturas_list = session.exec(select(CoberturaRequerida)).all()
+    all_coberturas = session.exec(select(CoberturaRequerida)).all()
     
     # Get manual restrictions
     restrictions = session.exec(
@@ -661,18 +680,17 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
 
         weekday = curr_date.weekday()  # 0=Monday, 6=Sunday
         
-        # Resolve bar opening hours for this day (seasonal rules override defaults)
-        bh = None
-        for rule in bar_hours_list:
-            if rule.dia_semana == weekday and rule.desde and rule.hasta:
-                if rule.desde <= date_str <= rule.hasta:
-                    bh = rule
-                    break
-        if not bh:
-            for rule in bar_hours_list:
-                if rule.dia_semana == weekday and (not rule.desde) and (not rule.hasta):
-                    bh = rule
-                    break
+        # Resolve active Temporada for this day
+        active_temp_id = get_temporada_id_for_date(date_str)
+        
+        # Filter rules for the active season
+        bar_hours_list = [h for h in all_bar_hours if h.temporada_id == active_temp_id]
+        turnos_list = [t for t in all_turnos if t.temporada_id == active_temp_id]
+        turnos_map = {t.nombre.lower(): (t.hora_inicio, t.hora_fin) for t in turnos_list}
+        coberturas_list = [c for c in all_coberturas if c.temporada_id == active_temp_id]
+        
+        # Resolve bar opening hours for this day
+        bh = next((b for b in bar_hours_list if b.dia_semana == weekday), None)
                     
         if not bh or not bh.abierto:
             continue
@@ -878,7 +896,8 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                 # Preference score
                 pref_score = 0
                 pref = emp.preferencia_turno
-                if slot_name == "Mañana":
+                slot_lower = slot_name.lower()
+                if "mañana" in slot_lower:
                     if pref == "Mañanas":
                         pref_score = 20
                     elif pref == "Alterno":
@@ -887,8 +906,8 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                         pref_score = 15 if (week_num + idx) % 2 == 0 else 10
                     else:
                         pref_score = 2
-                elif slot_name in ["Tarde", "Noche"]:
-                    if (slot_name == "Tarde" and pref == "Tardes") or (slot_name == "Noche" and pref == "Noches"):
+                elif "tarde" in slot_lower or "noche" in slot_lower:
+                    if (("tarde" in slot_lower) and pref == "Tardes") or (("noche" in slot_lower) and pref == "Noches"):
                         pref_score = 20
                     elif pref == "Alterno":
                         idx = sorted([e.id for e in employees if e.preferencia_turno == "Alterno"]).index(emp.id)

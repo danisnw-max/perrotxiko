@@ -67,9 +67,8 @@ class HorarioTrabajadorRead(HorarioTrabajadorBase):
 
 class HorarioBarBase(BaseModel):
     id: Optional[int] = None
+    temporada_id: int
     dia_semana: int
-    desde: Optional[str] = None
-    hasta: Optional[str] = None
     abierto: bool = True
     hora_apertura: Optional[str] = None
     hora_cierre: Optional[str] = None
@@ -82,6 +81,7 @@ class HorarioBarRead(HorarioBarBase):
 
 class CoberturaRequeridaBase(BaseModel):
     id: Optional[int] = None
+    temporada_id: Optional[int] = None
     dia_semana: Optional[int] = None
     fecha: Optional[str] = None
     turno: str
@@ -195,6 +195,7 @@ class EmpresaConfigUpdate(EmpresaConfigBase):
 
 class TurnoConfigBase(BaseModel):
     id: Optional[int] = None
+    temporada_id: int
     nombre: str
     hora_inicio: str
     hora_fin: str
@@ -203,4 +204,17 @@ class TurnoConfigCreate(TurnoConfigBase):
     pass
 
 class TurnoConfigRead(TurnoConfigBase):
+    pass
+
+class TemporadaBase(BaseModel):
+    id: Optional[int] = None
+    nombre: str
+    fecha_inicio: Optional[str] = None
+    fecha_fin: Optional[str] = None
+    es_defecto: bool = False
+
+class TemporadaCreate(TemporadaBase):
+    pass
+
+class TemporadaRead(TemporadaBase):
     pass

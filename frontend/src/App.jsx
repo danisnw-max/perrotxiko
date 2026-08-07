@@ -12,12 +12,19 @@ import FichajePinPadModal from './components/modals/FichajePinPadModal';
 import IncidenciasEmpleadoModal from './components/modals/IncidenciasEmpleadoModal';
 import PrePayrollModal from './components/modals/PrePayrollModal';
 import AuditoriaFichajesModal from './components/modals/AuditoriaFichajesModal';
+import ConfigWeeklyCalendar from './components/ConfigWeeklyCalendar';
 
 export default function App() {
   // Global States
   const [activeTab, setActiveTab] = useState('dashboard');
   const [employees, setEmployees] = useState([]);
   const [workSchedules, setWorkSchedules] = useState([]);
+
+  // Temporadas
+  const [temporadas, setTemporadas] = useState([]);
+  const [activeTemporadaId, setActiveTemporadaId] = useState(null);
+  const [isTemporadasModalOpen, setIsTemporadasModalOpen] = useState(false);
+  const [temporadaForm, setTemporadaForm] = useState({ id: null, nombre: '', fecha_inicio: '', fecha_fin: '', es_defecto: false });
   const [storeHours, setStoreHours] = useState([]);
   const [festivos, setFestivos] = useState([]);
   const [coberturas, setCoberturas] = useState([]);
@@ -86,7 +93,7 @@ export default function App() {
   // Role Coverages Modal
   const [isRefuerzosModalOpen, setIsRefuerzosModalOpen] = useState(false);
   const [coverageForm, setCoverageForm] = useState({
-    id: null, dia_semana: 0, fecha: '', turno: 'Mañana', puesto: 'Sala', cantidad: 1, descripcion: ''
+    id: null, dias_semana: [0], fecha: '', turno: 'Mañana', cantidades: { Sala: 1, Barra: 1, Cocinero: 1, Encargado: 1, Limpieza: 0 }, descripcion: ''
   });
   const [coverageType, setCoverageType] = useState('weekday');
 
@@ -159,6 +166,14 @@ export default function App() {
       const fests = await api.get('/configuracion/festivos');
       setFestivos(fests);
 
+      const temps = await api.get('/configuracion/temporadas');
+      setTemporadas(temps);
+      if (temps.length > 0) {
+        // Set default to "Todo el Año" or first
+        const defaultTemp = temps.find(t => t.es_defecto) || temps[0];
+        setActiveTemporadaId(defaultTemp.id);
+      }
+
       const empresaData = await api.get('/configuracion/empresa');
       setEmpresa(empresaData);
 
@@ -175,6 +190,27 @@ export default function App() {
       showToast("Error al cargar configuraciones", "error");
     }
   };
+
+  const loadConfigForTemporada = async (tempId) => {
+    try {
+      const hours = await api.get(`/configuracion/horario-bar?temporada_id=${tempId}`);
+      setStoreHours(hours);
+      
+      const cobs = await api.get(`/configuracion/coberturas?temporada_id=${tempId}`);
+      setCoberturas(cobs);
+
+      const turnosData = await api.get(`/configuracion/turnos?temporada_id=${tempId}`);
+      setTurnos(turnosData);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTemporadaId) {
+      loadConfigForTemporada(activeTemporadaId);
+    }
+  }, [activeTemporadaId]);
 
   useEffect(() => {
     loadEmployees();
@@ -370,18 +406,42 @@ export default function App() {
   const handleSaveCoverage = async (e) => {
     e.preventDefault();
     try {
-      const payload = {
-        ...coverageForm,
-        dia_semana: coverageType === 'weekday' ? coverageForm.dia_semana : null,
-        fecha: coverageType === 'date' ? coverageForm.fecha : null,
-        descripcion: coverageType === 'date' ? coverageForm.descripcion : null
-      };
-      await api.post('/configuracion/coberturas', payload);
-      showToast("Regla de cobertura guardada", "success");
-      setCoverageForm({ id: null, dia_semana: 0, fecha: '', turno: 'Mañana', puesto: 'Sala', cantidad: 1, descripcion: '' });
+      const puestos = ['Sala', 'Barra', 'Cocinero', 'Encargado', 'Limpieza'];
+      for (const p of puestos) {
+        const cant = coverageForm.cantidades[p];
+        if (cant > 0) {
+          if (coverageType === 'weekday') {
+            for (const dia of coverageForm.dias_semana) {
+              const payload = {
+                temporada_id: activeTemporadaId,
+                dia_semana: dia,
+                fecha: null,
+                descripcion: null,
+                turno: coverageForm.turno,
+                puesto: p,
+                cantidad: cant
+              };
+              await api.post('/configuracion/coberturas', payload);
+            }
+          } else {
+            const payload = {
+              temporada_id: activeTemporadaId,
+              dia_semana: null,
+              fecha: coverageForm.fecha,
+              descripcion: coverageForm.descripcion,
+              turno: coverageForm.turno,
+              puesto: p,
+              cantidad: cant
+            };
+            await api.post('/configuracion/coberturas', payload);
+          }
+        }
+      }
+      showToast("Reglas de cobertura guardadas", "success");
+      setCoverageForm({ id: null, dias_semana: [0], fecha: '', turno: turnos.length > 0 ? turnos[0].nombre : 'Mañana', cantidades: { Sala: 1, Barra: 1, Cocinero: 1, Encargado: 1, Limpieza: 0 }, descripcion: '' });
       loadConfig();
     } catch (err) {
-      showToast("Error al guardar cobertura", "error");
+      showToast("Error al guardar coberturas", "error");
     }
   };
 
@@ -444,7 +504,7 @@ export default function App() {
   const handleSaveTurno = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/configuracion/turnos', turnoForm);
+      await api.post('/configuracion/turnos', { ...turnoForm, temporada_id: activeTemporadaId });
       showToast("Turno guardado correctamente", "success");
       setTurnoForm({ id: null, nombre: '', hora_inicio: '09:00', hora_fin: '16:00' });
       loadConfig();
@@ -469,8 +529,7 @@ export default function App() {
     try {
       const payload = {
         ...barHoursForm,
-        desde: barHoursType === 'seasonal' ? barHoursForm.desde : null,
-        hasta: barHoursType === 'seasonal' ? barHoursForm.hasta : null,
+        temporada_id: activeTemporadaId,
         hora_apertura: barHoursForm.abierto ? barHoursForm.hora_apertura : null,
         hora_cierre: barHoursForm.abierto ? barHoursForm.hora_cierre : null
       };
@@ -539,6 +598,39 @@ export default function App() {
       fetchEmployeeRestrictions(selectedPrefsEmployee.id);
     } catch (e) {
       showToast("Error al eliminar restricción", "error");
+    }
+  };
+
+  const handleSaveTemporada = async (e) => {
+    e.preventDefault();
+    try {
+      if (temporadaForm.id) {
+        await api.put(`/configuracion/temporadas/${temporadaForm.id}`, temporadaForm);
+      } else {
+        await api.post('/configuracion/temporadas', temporadaForm);
+      }
+      showToast("Temporada guardada", "success");
+      setTemporadaForm({ id: null, nombre: '', fecha_inicio: '', fecha_fin: '', es_defecto: false });
+      
+      const temps = await api.get('/configuracion/temporadas');
+      setTemporadas(temps);
+    } catch (err) {
+      showToast("Error al guardar temporada", "error");
+    }
+  };
+
+  const handleDeleteTemporada = async (id) => {
+    if (!window.confirm("¿Seguro que deseas eliminar esta temporada y todos sus horarios/coberturas asociadas?")) return;
+    try {
+      await api.delete(`/configuracion/temporadas/${id}`);
+      showToast("Temporada eliminada", "success");
+      const temps = await api.get('/configuracion/temporadas');
+      setTemporadas(temps);
+      if (activeTemporadaId === id && temps.length > 0) {
+        setActiveTemporadaId(temps[0].id);
+      }
+    } catch (e) {
+      showToast("Error al eliminar temporada", "error");
     }
   };
 
@@ -930,105 +1022,55 @@ export default function App() {
                 </button>
               </form>
 
-              {/* Form 3: Turnos Config */}
-              <div className="p-6 bg-slate-900/40 rounded-[28px] border border-slate-800 space-y-6">
-                <div>
-                  <h3 className="font-bold text-slate-200 text-sm uppercase tracking-wider">Definición de Franjas de Turnos</h3>
-                  <p className="text-[10px] text-slate-550 font-bold uppercase tracking-widest mt-1">Configura las horas de entrada y salida de cada turno laboral</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column: List Turnos */}
-                  <div className="space-y-3">
-                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Turnos Definidos</label>
-                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2">
-                      {turnos.map(t => (
-                        <div key={t.id} className="p-3 bg-slate-850 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
-                          <div>
-                            <span className="font-bold text-slate-200">{t.nombre}</span>
-                            <span className="font-mono text-slate-400 ml-2">({t.hora_inicio} - {t.hora_fin})</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <button 
-                              type="button" 
-                              onClick={() => setTurnoForm(t)}
-                              className="text-[10px] font-bold text-indigo-400 hover:underline cursor-pointer"
-                            >
-                              Editar
-                            </button>
-                            <button 
-                              type="button" 
-                              onClick={() => handleDeleteTurno(t.id)}
-                              className="text-slate-500 hover:text-rose-400 cursor-pointer"
-                            >
-                              <Trash2 size={12}/>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {turnos.length === 0 && (
-                        <p className="text-xs text-slate-500 italic py-6">Sin turnos definidos. Crea uno a la derecha.</p>
-                      )}
+              {/* Form 3: Configuración Semanal Visual */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-end">
+                  <div>
+                    <h3 className="font-bold text-slate-200 text-sm uppercase tracking-wider">Planificación Semanal</h3>
+                    <p className="text-[10px] text-slate-550 font-bold uppercase tracking-widest mt-1">Horarios y Coberturas por Temporada</p>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Temporada:</label>
+                    <div className="flex gap-1">
+                      <select 
+                        value={activeTemporadaId || ''} 
+                        onChange={e => setActiveTemporadaId(parseInt(e.target.value))}
+                        className="border border-slate-750 p-2 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none min-w-[150px]"
+                      >
+                        {temporadas.map(t => (
+                          <option key={t.id} value={t.id}>{t.nombre}</option>
+                        ))}
+                      </select>
+                      <button 
+                        onClick={() => setIsTemporadasModalOpen(true)}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl cursor-pointer"
+                        title="Gestionar Temporadas"
+                      >
+                        <Settings size={14}/>
+                      </button>
                     </div>
                   </div>
-
-                  {/* Right Column: Add/Edit Turno Form */}
-                  <form onSubmit={handleSaveTurno} className="space-y-4 bg-slate-950/20 p-4 rounded-xl border border-slate-800 text-left">
-                    <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider pb-1 border-b border-slate-850">
-                      {turnoForm.id ? 'Editar Franja' : 'Añadir Franja'}
-                    </h4>
-
-                    <div>
-                      <label className="block text-[9px] font-black text-slate-450 uppercase tracking-widest mb-1">Nombre del Turno</label>
-                      <input 
-                        type="text" 
-                        placeholder="Ej. Mañana, Tarde, Refuerzo"
-                        value={turnoForm.nombre} 
-                        onChange={e => setTurnoForm({...turnoForm, nombre: e.target.value})} 
-                        className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-xs font-bold text-slate-200 outline-none" 
-                        required
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[9px] font-black text-slate-455 uppercase tracking-widest mb-1">Hora Inicio</label>
-                        <input 
-                          type="time" 
-                          value={turnoForm.hora_inicio} 
-                          onChange={e => setTurnoForm({...turnoForm, hora_inicio: e.target.value})} 
-                          className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[9px] font-black text-slate-455 uppercase tracking-widest mb-1">Hora Fin</label>
-                        <input 
-                          type="time" 
-                          value={turnoForm.hora_fin} 
-                          onChange={e => setTurnoForm({...turnoForm, hora_fin: e.target.value})} 
-                          className="w-full border border-slate-750 p-2 rounded-lg bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                      <button type="submit" className="flex-1 py-2 bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer">
-                        {turnoForm.id ? 'Guardar Cambios' : 'Crear Turno'}
-                      </button>
-                      {turnoForm.id && (
-                        <button 
-                          type="button" 
-                          onClick={() => setTurnoForm({ id: null, nombre: '', hora_inicio: '09:00', hora_fin: '16:00' })}
-                          className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
-                      )}
-                    </div>
-                  </form>
                 </div>
+
+                <ConfigWeeklyCalendar 
+                  temporada={temporadas.find(t => t.id === activeTemporadaId)}
+                  storeHours={storeHours}
+                  turnos={turnos}
+                  coberturas={coberturas}
+                  onEditDayHours={(dayId, currentHours) => {
+                    setBarHoursForm({ ...currentHours, dia_semana: dayId });
+                    setIsStoreHoursModalOpen(true);
+                  }}
+                  onAddTurnoToDay={(dayId, existingTurnoNombre) => {
+                    setCoverageForm(prev => ({
+                      ...prev,
+                      dias_semana: [dayId],
+                      turno: existingTurnoNombre || (turnos.length > 0 ? turnos[0].nombre : 'Mañana')
+                    }));
+                    setCoverageType('weekday');
+                    setIsRefuerzosModalOpen(true);
+                  }}
+                />
               </div>
 
             </div>
@@ -1497,101 +1539,34 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-4xl w-full flex flex-col md:flex-row gap-6 max-h-[85vh] text-left">
             
-            {/* Left side: List current opening hours */}
-            <div className="w-full md:w-1/2 flex flex-col overflow-y-auto pr-2">
-              <h3 className="text-lg font-black text-slate-100 tracking-tight mb-2">Horarios del Bar</h3>
-              <p className="text-[10px] text-slate-500 leading-relaxed mb-4">
-                Listado de horarios por día de la semana y rangos de fechas (temporadas). Las reglas de temporada sobreescriben a las generales.
-              </p>
-              
-              <div className="space-y-2 flex-1">
-                {storeHours.map(bh => {
-                  const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-                  const isSeasonal = !!bh.desde;
-                  return (
-                    <div 
-                      key={bh.id} 
-                      onClick={() => {
-                        setBarHoursForm(bh);
-                        setBarHoursType(isSeasonal ? 'seasonal' : 'always');
-                      }}
-                      className="p-3 bg-slate-850 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl flex justify-between items-center text-xs cursor-pointer transition-all"
-                      title="Haz clic para editar este horario"
-                    >
-                      <div className="text-left">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-200">{dayNames[bh.dia_semana]}</span>
-                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                            isSeasonal ? 'bg-indigo-950/50 text-indigo-400 border border-indigo-900/30' : 'bg-slate-900 text-slate-400'
-                          }`}>
-                            {isSeasonal ? `${bh.desde} a ${bh.hasta}` : 'Todo el año'}
-                          </span>
-                        </div>
-                        <p className="text-slate-400 mt-1 font-bold">
-                          {bh.abierto ? (
-                            <span>
-                              {bh.hora_apertura} - {bh.hora_cierre}
-                            </span>
-                          ) : (
-                            <span className="text-rose-400 font-bold">Cerrado</span>
-                          )}
-                        </p>
-                      </div>
-                      {isSeasonal && (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteStoreHours(bh.id);
-                          }} 
-                          className="p-1 hover:text-rose-400 text-slate-500 transition-colors cursor-pointer"
-                        >
-                          <Trash2 size={12}/>
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
             {/* Right side: Add/Edit form */}
-            <form onSubmit={handleSaveStoreHours} className="w-full md:w-1/2 space-y-4 bg-slate-950/20 p-5 rounded-2xl border border-slate-800 text-left flex flex-col justify-between">
+            <form onSubmit={handleSaveStoreHours} className="w-full space-y-4 bg-slate-950/20 p-5 rounded-2xl border border-slate-800 text-left flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="flex justify-between items-center pb-2 border-b border-slate-850">
                   <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
                     {barHoursForm.id ? 'Editar Horario' : 'Añadir Horario'}
                   </h4>
                   {barHoursForm.id && (
-                    <button 
-                      type="button" 
-                      onClick={() => setBarHoursForm({ id: null, dia_semana: 0, desde: '', hasta: '', abierto: true, hora_apertura: '09:00', hora_cierre: '00:00' })}
-                      className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:underline cursor-pointer"
-                    >
-                      Limpiar / Nuevo
-                    </button>
+                    <div className="flex gap-4 items-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleDeleteStoreHours(barHoursForm.id);
+                          setIsStoreHoursModalOpen(false);
+                        }}
+                        className="text-[9px] font-black text-rose-400 uppercase tracking-widest hover:underline cursor-pointer"
+                      >
+                        Eliminar Horario
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setBarHoursForm({ id: null, dia_semana: 0, abierto: true, hora_apertura: '09:00', hora_cierre: '00:00' })}
+                        className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:underline cursor-pointer"
+                      >
+                        Limpiar / Nuevo
+                      </button>
+                    </div>
                   )}
-                </div>
-                
-                {/* Type Switcher */}
-                <div className="flex gap-1.5 bg-slate-900 p-1 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => setBarHoursType('always')}
-                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
-                      barHoursType === 'always' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Todo el año
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBarHoursType('seasonal')}
-                    className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
-                      barHoursType === 'seasonal' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Temporada
-                  </button>
                 </div>
 
                 <div>
@@ -1606,31 +1581,6 @@ export default function App() {
                     ))}
                   </select>
                 </div>
-
-                {barHoursType === 'seasonal' && (
-                  <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
-                    <div>
-                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Desde</label>
-                      <input 
-                        type="date" 
-                        value={barHoursForm.desde || ''} 
-                        onChange={e => setBarHoursForm({...barHoursForm, desde: e.target.value})} 
-                        className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Hasta</label>
-                      <input 
-                        type="date" 
-                        value={barHoursForm.hasta || ''} 
-                        onChange={e => setBarHoursForm({...barHoursForm, hasta: e.target.value})} 
-                        className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
 
                 <div className="flex items-center gap-2 py-2">
                   <input 
@@ -1678,44 +1628,11 @@ export default function App() {
       {/* 10. Role Coverages Setup Modal */}
       {isRefuerzosModalOpen && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-3xl w-full flex flex-col md:flex-row gap-6 max-h-[85vh] text-left">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-lg w-full flex flex-col gap-6 max-h-[85vh] text-left">
             
-            {/* Left side: list current rules */}
-            <div className="w-full md:w-1/2 flex flex-col overflow-y-auto">
-              <h3 className="text-lg font-black text-slate-100 tracking-tight mb-2">Cobertura Requerida</h3>
-              <p className="text-[10px] text-slate-500 leading-relaxed mb-4">Define cuántos empleados de cada puesto son necesarios por día y turno para el generador.</p>
-              
-              <div className="space-y-2 flex-1">
-                {coberturas.map(c => {
-                  const dayNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-                  const isDateRule = !!c.fecha;
-                  const label = isDateRule ? c.fecha : dayNames[c.dia_semana];
-                  return (
-                    <div key={c.id} className="p-3 bg-slate-850 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
-                      <div>
-                        <span className={`font-bold ${isDateRule ? 'text-indigo-400 font-mono' : 'text-slate-200'}`}>{label}</span>
-                        {c.descripcion && (
-                          <span className="text-[9px] text-slate-550 font-bold ml-1.5 uppercase tracking-wider">({c.descripcion})</span>
-                        )}
-                        <span className="text-slate-500 mx-2">|</span>
-                        <span className="text-indigo-400 font-bold">{c.turno}</span>
-                        <p className="text-slate-400 mt-1 font-bold">{c.puesto}: {c.cantidad} pers.</p>
-                      </div>
-                      <button onClick={() => handleDeleteCoverage(c.id)} className="p-1 hover:text-rose-400 text-slate-500 transition-colors cursor-pointer">
-                        <Trash2 size={12}/>
-                      </button>
-                    </div>
-                  );
-                })}
-                {coberturas.length === 0 && (
-                  <p className="text-xs text-slate-500 italic py-6">Sin reglas configuradas. Se aplicará el fallback básico.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Right side: Add rule form */}
-            <form onSubmit={handleSaveCoverage} className="w-full md:w-1/2 space-y-4 bg-slate-950/20 p-5 rounded-2xl border border-slate-800 text-left">
-              <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider pb-2 border-b border-slate-800">Añadir Regla</h4>
+            {/* Form */}
+            <form onSubmit={handleSaveCoverage} className="w-full space-y-4 bg-slate-950/20 p-5 rounded-2xl border border-slate-800 text-left">
+              <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider pb-2 border-b border-slate-800">Añadir Regla de Cobertura</h4>
               
               {/* Type Switcher */}
               <div className="flex gap-1.5 bg-slate-900 p-1 rounded-xl">
@@ -1741,12 +1658,32 @@ export default function App() {
 
               {coverageType === 'weekday' ? (
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Día de la Semana</label>
-                  <select value={coverageForm.dia_semana} onChange={e => setCoverageForm({...coverageForm, dia_semana: parseInt(e.target.value)})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none">
-                    {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map((dayName, idx) => (
-                      <option key={idx} value={idx}>{dayName}</option>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Días de la Semana</label>
+                  <div className="flex flex-wrap gap-2">
+                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((dayChar, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          const currentDays = coverageForm.dias_semana;
+                          if (currentDays.includes(idx)) {
+                            if (currentDays.length > 1) {
+                              setCoverageForm({...coverageForm, dias_semana: currentDays.filter(d => d !== idx)});
+                            }
+                          } else {
+                            setCoverageForm({...coverageForm, dias_semana: [...currentDays, idx]});
+                          }
+                        }}
+                        className={`w-9 h-9 flex items-center justify-center rounded-lg text-xs font-black transition-all border cursor-pointer ${
+                          coverageForm.dias_semana.includes(idx) 
+                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/50' 
+                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-750'
+                        }`}
+                      >
+                        {dayChar}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4 animate-in fade-in duration-200">
@@ -1790,24 +1727,30 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Puesto Requerido</label>
-                <select value={coverageForm.puesto} onChange={e => setCoverageForm({...coverageForm, puesto: e.target.value})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none">
-                  <option value="Sala">Sala</option>
-                  <option value="Barra">Barra</option>
-                  <option value="Cocinero">Cocinero</option>
-                  <option value="Encargado">Encargado</option>
-                  <option value="Limpieza">Limpieza</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Cantidad Requerida</label>
-                <input type="number" min={1} max={10} value={coverageForm.cantidad} onChange={e => setCoverageForm({...coverageForm, cantidad: parseInt(e.target.value) || 1})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono"/>
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Personal Necesario</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {['Sala', 'Barra', 'Cocinero', 'Encargado', 'Limpieza'].map(p => (
+                    <div key={p} className="flex items-center justify-between bg-slate-900 border border-slate-750 p-2 rounded-xl">
+                      <span className="text-xs font-bold text-slate-300">{p}</span>
+                      <input 
+                        type="number" 
+                        min={0} 
+                        max={10} 
+                        value={coverageForm.cantidades[p]} 
+                        onChange={e => setCoverageForm({
+                          ...coverageForm, 
+                          cantidades: { ...coverageForm.cantidades, [p]: parseInt(e.target.value) || 0 }
+                        })} 
+                        className="w-12 bg-slate-800 border border-slate-700 text-center text-xs font-bold text-slate-200 rounded p-1 outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button type="submit" className="flex-1 py-3 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center transition-all cursor-pointer">
-                  Añadir Regla
+                  Guardar Cobertura
                 </button>
                 <button type="button" onClick={() => setIsRefuerzosModalOpen(false)} className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-700 cursor-pointer">
                   Cerrar
@@ -1963,6 +1906,134 @@ export default function App() {
         </div>
       )}
 
+      {/* 13. Temporadas Management Modal */}
+      {isTemporadasModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-3xl w-full flex flex-col md:flex-row gap-6 max-h-[85vh] text-left">
+            
+            <div className="w-full md:w-1/2 flex flex-col overflow-y-auto pr-2">
+              <h3 className="text-lg font-black text-slate-100 tracking-tight mb-2">Temporadas</h3>
+              <p className="text-[10px] text-slate-500 leading-relaxed mb-4">
+                Define las diferentes temporadas para configurar horarios del bar y coberturas de turnos distintos.
+              </p>
+              
+              <div className="space-y-2 flex-1">
+                {temporadas.map(t => (
+                  <div key={t.id} className="p-3 bg-slate-850 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-200">{t.nombre}</span>
+                        {t.es_defecto && (
+                          <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-950/50 text-indigo-400 border border-indigo-900/30">
+                            Defecto
+                          </span>
+                        )}
+                      </div>
+                      {!t.es_defecto && t.fecha_inicio && t.fecha_fin && (
+                        <p className="text-slate-400 mt-1 font-mono text-[10px]">
+                          {t.fecha_inicio} a {t.fecha_fin}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <button 
+                        onClick={() => setTemporadaForm(t)} 
+                        className="p-1 hover:text-indigo-400 text-slate-500 transition-colors cursor-pointer"
+                      >
+                        <Edit2 size={12}/>
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteTemporada(t.id)} 
+                        className="p-1 hover:text-rose-400 text-slate-500 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={12}/>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveTemporada} className="w-full md:w-1/2 space-y-4 bg-slate-950/20 p-5 rounded-2xl border border-slate-800 text-left flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-850">
+                  <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider">
+                    {temporadaForm.id ? 'Editar Temporada' : 'Añadir Temporada'}
+                  </h4>
+                  {temporadaForm.id && (
+                    <button 
+                      type="button" 
+                      onClick={() => setTemporadaForm({ id: null, nombre: '', fecha_inicio: '', fecha_fin: '', es_defecto: false })}
+                      className="text-[9px] font-black text-indigo-400 uppercase tracking-widest hover:underline cursor-pointer"
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Nombre de la Temporada</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej. Verano, Semana Santa, Invierno"
+                    value={temporadaForm.nombre} 
+                    onChange={e => setTemporadaForm({...temporadaForm, nombre: e.target.value})} 
+                    className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 py-2">
+                  <input 
+                    type="checkbox" 
+                    id="t-defecto"
+                    checked={temporadaForm.es_defecto} 
+                    onChange={e => setTemporadaForm({...temporadaForm, es_defecto: e.target.checked})}
+                    className="rounded border-slate-750 bg-slate-900 text-indigo-600 focus:ring-0 cursor-pointer"
+                  />
+                  <label htmlFor="t-defecto" className="text-xs font-bold text-slate-350 cursor-pointer select-none">
+                    Es la temporada por Defecto
+                  </label>
+                </div>
+                
+                {!temporadaForm.es_defecto && (
+                  <div className="grid grid-cols-2 gap-4 animate-in fade-in duration-200">
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Mes-Día Inicio</label>
+                      <input 
+                        type="text" 
+                        placeholder="MM-DD (ej. 06-01)"
+                        value={temporadaForm.fecha_inicio || ''} 
+                        onChange={e => setTemporadaForm({...temporadaForm, fecha_inicio: e.target.value})} 
+                        className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-mono">Mes-Día Fin</label>
+                      <input 
+                        type="text" 
+                        placeholder="MM-DD (ej. 08-31)"
+                        value={temporadaForm.fecha_fin || ''} 
+                        onChange={e => setTemporadaForm({...temporadaForm, fecha_fin: e.target.value})} 
+                        className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono" 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-4 border-t border-slate-800">
+                <button type="submit" className="flex-1 py-3 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center transition-all cursor-pointer">
+                  Guardar
+                </button>
+                <button type="button" onClick={() => setIsTemporadasModalOpen(false)} className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl text-xs font-black uppercase tracking-wider transition-all border border-slate-700 cursor-pointer">
+                  Cerrar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

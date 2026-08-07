@@ -9,7 +9,8 @@ from models import (
     CierreBar,
     EmpresaConfig,
     SMTPConfig,
-    TurnoConfig
+    TurnoConfig,
+    Temporada
 )
 from schemas import (
     HorarioBarRead,
@@ -17,24 +18,62 @@ from schemas import (
     FestivoRead,
     EmpresaConfigRead,
     SMTPConfigRead,
-    TurnoConfigRead
+    TurnoConfigRead,
+    TemporadaRead
 )
 
 router = APIRouter(tags=["configuracion"])
 
+# === TEMPORADAS ===
+@router.get("/api/configuracion/temporadas", response_model=List[TemporadaRead])
+def get_temporadas(session: Session = Depends(get_session)):
+    return session.exec(select(Temporada).order_by(Temporada.id)).all()
+
+@router.post("/api/configuracion/temporadas", response_model=TemporadaRead)
+def save_temporada(temp: Temporada, session: Session = Depends(get_session)):
+    if temp.id:
+        db_temp = session.get(Temporada, temp.id)
+        if db_temp:
+            db_temp.nombre = temp.nombre
+            db_temp.fecha_inicio = temp.fecha_inicio
+            db_temp.fecha_fin = temp.fecha_fin
+            db_temp.es_defecto = temp.es_defecto
+            session.add(db_temp)
+            session.commit()
+            session.refresh(db_temp)
+            return db_temp
+            
+    session.add(temp)
+    session.commit()
+    session.refresh(temp)
+    return temp
+
+@router.delete("/api/configuracion/temporadas/{id}")
+def delete_temporada(id: int, session: Session = Depends(get_session)):
+    db_temp = session.get(Temporada, id)
+    if not db_temp:
+        raise HTTPException(status_code=404, detail="Temporada no encontrada")
+    session.delete(db_temp)
+    session.commit()
+    return {"detail": "Temporada eliminada correctamente"}
+
+
+
 # === HORARIOS APERTURA BAR ===
 @router.get("/api/configuracion/horario-bar", response_model=List[HorarioBarRead])
-def get_horario_bar(session: Session = Depends(get_session)):
-    return session.exec(select(HorarioBar).order_by(HorarioBar.desde, HorarioBar.dia_semana)).all()
+def get_horario_bar(temporada_id: int = None, session: Session = Depends(get_session)):
+    q = select(HorarioBar).order_by(HorarioBar.dia_semana)
+    if temporada_id:
+        q = q.where(HorarioBar.temporada_id == temporada_id)
+    return session.exec(q).all()
 
 @router.post("/api/configuracion/horario-bar", response_model=HorarioBarRead)
 def save_horario_bar(hb: HorarioBar, session: Session = Depends(get_session)):
     if hb.id:
         db_hb = session.get(HorarioBar, hb.id)
         if db_hb:
+            db_hb.temporada_id = hb.temporada_id
             db_hb.dia_semana = hb.dia_semana
-            db_hb.desde = hb.desde
-            db_hb.hasta = hb.hasta
             db_hb.abierto = hb.abierto
             db_hb.hora_apertura = hb.hora_apertura
             db_hb.hora_cierre = hb.hora_cierre
@@ -60,14 +99,18 @@ def delete_horario_bar(id: int, session: Session = Depends(get_session)):
 
 # === GESTIÓN DE TURNOS (FRANJAS HORARIAS) ===
 @router.get("/api/configuracion/turnos", response_model=List[TurnoConfigRead])
-def get_turnos(session: Session = Depends(get_session)):
-    return session.exec(select(TurnoConfig).order_by(TurnoConfig.nombre)).all()
+def get_turnos(temporada_id: int = None, session: Session = Depends(get_session)):
+    q = select(TurnoConfig).order_by(TurnoConfig.nombre)
+    if temporada_id:
+        q = q.where(TurnoConfig.temporada_id == temporada_id)
+    return session.exec(q).all()
 
 @router.post("/api/configuracion/turnos", response_model=TurnoConfigRead)
 def save_turno(turno: TurnoConfig, session: Session = Depends(get_session)):
     if turno.id:
         db_turno = session.get(TurnoConfig, turno.id)
         if db_turno:
+            db_turno.temporada_id = turno.temporada_id
             db_turno.nombre = turno.nombre
             db_turno.hora_inicio = turno.hora_inicio
             db_turno.hora_fin = turno.hora_fin
@@ -94,14 +137,18 @@ def delete_turno(id: int, session: Session = Depends(get_session)):
 
 # === COBERTURAS REQUERIDAS POR ROL ===
 @router.get("/api/configuracion/coberturas", response_model=List[CoberturaRequeridaRead])
-def get_coberturas(session: Session = Depends(get_session)):
-    return session.exec(select(CoberturaRequerida).order_by(CoberturaRequerida.fecha, CoberturaRequerida.dia_semana, CoberturaRequerida.turno)).all()
+def get_coberturas(temporada_id: int = None, session: Session = Depends(get_session)):
+    q = select(CoberturaRequerida).order_by(CoberturaRequerida.fecha, CoberturaRequerida.dia_semana, CoberturaRequerida.turno)
+    if temporada_id:
+        q = q.where(CoberturaRequerida.temporada_id == temporada_id)
+    return session.exec(q).all()
 
 @router.post("/api/configuracion/coberturas", response_model=CoberturaRequeridaRead)
 def save_cobertura(cob: CoberturaRequerida, session: Session = Depends(get_session)):
     if cob.id:
         db_cob = session.get(CoberturaRequerida, cob.id)
         if db_cob:
+            db_cob.temporada_id = cob.temporada_id
             db_cob.dia_semana = cob.dia_semana
             db_cob.fecha = cob.fecha
             db_cob.turno = cob.turno

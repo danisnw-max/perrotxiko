@@ -85,17 +85,24 @@ class HorarioTrabajador(SQLModel, table=True):
     hora_fin: str  # HH:MM
     notas: Optional[str] = None
 
+class Temporada(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nombre: str = Field(index=True)
+    fecha_inicio: Optional[str] = None  # MM-DD
+    fecha_fin: Optional[str] = None     # MM-DD
+    es_defecto: bool = Field(default=False)
+
 class HorarioBar(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    temporada_id: int = Field(foreign_key="temporada.id")
     dia_semana: int = Field(index=True)  # 0=Lunes, 6=Domingo
-    desde: Optional[str] = Field(default=None, index=True)  # YYYY-MM-DD
-    hasta: Optional[str] = Field(default=None, index=True)  # YYYY-MM-DD
     abierto: bool = Field(default=True)
     hora_apertura: Optional[str] = None  # HH:MM
     hora_cierre: Optional[str] = None  # HH:MM
 
 class CoberturaRequerida(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    temporada_id: Optional[int] = Field(default=None, foreign_key="temporada.id")
     dia_semana: Optional[int] = Field(default=None, index=True)  # 0=Lunes, 6=Domingo, None si es por fecha específica
     fecha: Optional[str] = Field(default=None, index=True)       # YYYY-MM-DD, None si es recurrente por día de semana
     turno: str = Field(index=True)       # Mañana, Tarde, Noche
@@ -132,6 +139,7 @@ class EmpresaConfig(SQLModel, table=True):
 
 class TurnoConfig(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    temporada_id: int = Field(foreign_key="temporada.id")
     nombre: str = Field(index=True)  # Ej. "Mañana", "Tarde", "Noche"
     hora_inicio: str  # HH:MM
     hora_fin: str  # HH:MM

@@ -69,18 +69,27 @@ def get_horario_bar(temporada_id: int = None, session: Session = Depends(get_ses
 
 @router.post("/api/configuracion/horario-bar", response_model=HorarioBarRead)
 def save_horario_bar(hb: HorarioBar, session: Session = Depends(get_session)):
+    db_hb = None
     if hb.id:
         db_hb = session.get(HorarioBar, hb.id)
-        if db_hb:
-            db_hb.temporada_id = hb.temporada_id
-            db_hb.dia_semana = hb.dia_semana
-            db_hb.abierto = hb.abierto
-            db_hb.hora_apertura = hb.hora_apertura
-            db_hb.hora_cierre = hb.hora_cierre
-            session.add(db_hb)
-            session.commit()
-            session.refresh(db_hb)
-            return db_hb
+    else:
+        # Check if one already exists for this temporada and dia_semana
+        q = select(HorarioBar).where(
+            HorarioBar.temporada_id == hb.temporada_id,
+            HorarioBar.dia_semana == hb.dia_semana
+        )
+        db_hb = session.exec(q).first()
+        
+    if db_hb:
+        db_hb.temporada_id = hb.temporada_id
+        db_hb.dia_semana = hb.dia_semana
+        db_hb.abierto = hb.abierto
+        db_hb.hora_apertura = hb.hora_apertura
+        db_hb.hora_cierre = hb.hora_cierre
+        session.add(db_hb)
+        session.commit()
+        session.refresh(db_hb)
+        return db_hb
             
     session.add(hb)
     session.commit()

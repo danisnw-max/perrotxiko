@@ -70,90 +70,31 @@ def get_empleado_read(
     current_year = str(datetime.now().year)
     current_month_prefix = datetime.now().strftime("%Y-%m")
     
-    # 1. Vacaciones
-    if pre_shifts is not None:
-        usadas_vac_shifts = len([s for s in pre_shifts if s.turno == "Vacaciones" and s.fecha.startswith(current_year)])
-    else:
-        usadas_vac_shifts = len(session.exec(
-            select(HorarioTrabajador)
-            .where(HorarioTrabajador.empleado_id == emp.id)
-            .where(HorarioTrabajador.turno == "Vacaciones")
-            .where(HorarioTrabajador.fecha.startswith(current_year))
-        ).all())
+    shifts = pre_shifts if pre_shifts is not None else session.exec(
+        select(HorarioTrabajador)
+        .where(HorarioTrabajador.empleado_id == emp.id)
+        .where(HorarioTrabajador.fecha.startswith(current_year))
+    ).all()
         
-    if pre_incidents is not None:
-        usadas_vac_incidents = len([
-            inc for inc in pre_incidents 
-            if inc.categoria == "Permiso" 
-            and inc.tipo == "Vacaciones" 
-            and inc.estado == "Aprobado" 
-            and inc.fecha_inicio.startswith(current_year)
-        ])
-    else:
-        usadas_vac_incidents = len(session.exec(
-            select(IncidenciaEmpleado)
-            .where(IncidenciaEmpleado.empleado_id == emp.id)
-            .where(IncidenciaEmpleado.categoria == "Permiso")
-            .where(IncidenciaEmpleado.tipo == "Vacaciones")
-            .where(IncidenciaEmpleado.estado == "Aprobado")
-            .where(IncidenciaEmpleado.fecha_inicio.startswith(current_year))
-        ).all())
+    incidents = pre_incidents if pre_incidents is not None else session.exec(
+        select(IncidenciaEmpleado)
+        .where(IncidenciaEmpleado.empleado_id == emp.id)
+        .where(IncidenciaEmpleado.categoria == "Permiso")
+        .where(IncidenciaEmpleado.estado == "Aprobado")
+        .where(IncidenciaEmpleado.fecha_inicio.startswith(current_year))
+    ).all()
         
-    vac_usadas = usadas_vac_shifts + usadas_vac_incidents
+    vac_usadas = sum(1 for s in shifts if s.turno == "Vacaciones") + sum(1 for inc in incidents if inc.tipo == "Vacaciones")
+    ld_usadas = sum(1 for s in shifts if s.turno == "Libre Disposición") + sum(1 for inc in incidents if inc.tipo == "Asuntos propios")
     
-    # 2. Libre Disposición
-    if pre_shifts is not None:
-        usadas_ld_shifts = len([s for s in pre_shifts if s.turno == "Libre Disposición" and s.fecha.startswith(current_year)])
-    else:
-        usadas_ld_shifts = len(session.exec(
-            select(HorarioTrabajador)
-            .where(HorarioTrabajador.empleado_id == emp.id)
-            .where(HorarioTrabajador.turno == "Libre Disposición")
-            .where(HorarioTrabajador.fecha.startswith(current_year))
-        ).all())
-        
-    if pre_incidents is not None:
-        usadas_ld_incidents = len([
-            inc for inc in pre_incidents 
-            if inc.categoria == "Permiso" 
-            and inc.tipo == "Asuntos propios" 
-            and inc.estado == "Aprobado" 
-            and inc.fecha_inicio.startswith(current_year)
-        ])
-    else:
-        usadas_ld_incidents = len(session.exec(
-            select(IncidenciaEmpleado)
-            .where(IncidenciaEmpleado.empleado_id == emp.id)
-            .where(IncidenciaEmpleado.categoria == "Permiso")
-            .where(IncidenciaEmpleado.tipo == "Asuntos propios")
-            .where(IncidenciaEmpleado.estado == "Aprobado")
-            .where(IncidenciaEmpleado.fecha_inicio.startswith(current_year))
-        ).all())
-        
-    ld_usadas = usadas_ld_shifts + usadas_ld_incidents
-    
-    # 3. Horas trabajadas
-    if pre_shifts is not None:
-        turnos_trabajados = [
-            s for s in pre_shifts 
-            if s.fecha.startswith(current_year) 
-            and s.turno not in ["Vacaciones", "Libre Disposición", "Festivo", "Libre", "Baja", "Permiso"]
-        ]
-    else:
-        turnos_trabajados = session.exec(
-            select(HorarioTrabajador)
-            .where(HorarioTrabajador.empleado_id == emp.id)
-            .where(HorarioTrabajador.fecha.startswith(current_year))
-            .where(HorarioTrabajador.turno.notin_(["Vacaciones", "Libre Disposición", "Festivo", "Libre", "Baja", "Permiso"]))
-        ).all()
-        
     horas_mes = 0.0
     horas_anio = 0.0
-    for t in turnos_trabajados:
-        h = calculate_shift_hours(t.hora_inicio, t.hora_fin)
-        horas_anio += h
-        if t.fecha.startswith(current_month_prefix):
-            horas_mes += h
+    for t in shifts:
+        if t.turno not in ["Vacaciones", "Libre Disposición", "Festivo", "Libre", "Baja", "Permiso"]:
+            h = calculate_shift_hours(t.hora_inicio, t.hora_fin)
+            horas_anio += h
+            if t.fecha.startswith(current_month_prefix):
+                horas_mes += h
             
     return EmpleadoRead(
         **emp.dict(),

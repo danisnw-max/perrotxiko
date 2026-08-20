@@ -675,6 +675,30 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
 
     accumulated_minutes_this_month = {emp.id: 0.0 for emp in employees}
     
+    # Track days worked in the current week (resets every Monday)
+    days_worked_in_week = {emp.id: 0 for emp in employees}
+    current_iso_week = dt.isocalendar()[1]
+    
+    # Initialize days worked for the first week if it started in the previous month
+    first_week_start = dt - timedelta(days=dt.weekday())
+    if first_week_start < dt:
+        first_week_shifts = session.exec(
+            select(HorarioTrabajador)
+            .where(HorarioTrabajador.empleado_id.in_([e.id for e in employees]))
+            .where(HorarioTrabajador.fecha >= first_week_start.strftime("%Y-%m-%d"))
+            .where(HorarioTrabajador.fecha < dt.strftime("%Y-%m-%d"))
+            .where(HorarioTrabajador.turno.notin_(["Vacaciones", "Baja", "Libre", "Permiso"]))
+        ).all()
+        # Count distinct days worked per employee
+        worked_dates = {}
+        for s in first_week_shifts:
+            if s.empleado_id not in worked_dates:
+                worked_dates[s.empleado_id] = set()
+            worked_dates[s.empleado_id].add(s.fecha)
+            
+        for emp_id, dates in worked_dates.items():
+            days_worked_in_week[emp_id] = len(dates)
+    
     # Fetch previous day's end shifts to check 12h rest gap
     prev_month_end = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
     prev_shifts = session.exec(
@@ -721,6 +745,13 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         curr_date = datetime(year, month, d)
         date_str = curr_date.strftime("%Y-%m-%d")
         
+        weekday = curr_date.weekday()  # 0=Monday, 6=Sunday
+        
+        # Reset weekly worked days counter if it's a new week
+        if weekday == 0:
+            for emp_id in days_worked_in_week:
+                days_worked_in_week[emp_id] = 0
+        
         if date_str in cierres_by_date:
             continue
             
@@ -738,9 +769,16 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                     notas=f"Festivo: {festivo_info.descripcion}"
                 )
                 session.add(new_shift)
+                days_worked_in_week[emp.id] = days_worked_in_week.get(emp.id, 0) + 1
             continue
-
-        weekday = curr_date.weekday()  # 0=Monday, 6=Sunday
+        employees_working_today = set()
+        
+        # Any employee on vacation or leave today effectively consumes a "worked" day 
+        # so they don't lose their actual days off.
+        for emp in employees:
+            if (date_str, emp.id) in vacaciones_by_date_emp:
+                employees_working_today.add(emp.id)
+                days_worked_in_week[emp.id] = days_worked_in_week.get(emp.id, 0) + 1
         
         # Apply Fixed Schedules for this day
         fixed_assignments_today = []
@@ -760,6 +798,9 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                 session.add(new_shift)
                 fixed_assignments.add((date_str, emp.id))
                 fixed_assignments_today.append((emp, fixed.hora_inicio, fixed.hora_fin))
+                if emp.id not in employees_working_today:
+                    employees_working_today.add(emp.id)
+                    days_worked_in_week[emp.id] = days_worked_in_week.get(emp.id, 0) + 1
                 try:
                     duration = calculate_shift_hours(fixed.hora_inicio, fixed.hora_fin)
                     accumulated_minutes_this_month[emp.id] += duration * 60
@@ -932,7 +973,13 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
 
                 return True
                 
-            matching_emps = [e for e in employees if puede_cubrir_puesto(e, role_req) and e.estado == "Activo" and esta_disponible_dia(e, weekday, slot[1], slot[2])]
+            matching_emps = [
+                e for e in employees 
+                if puede_cubrir_puesto(e, role_req) 
+                and e.estado == "Activo" 
+                and esta_disponible_dia(e, weekday, slot[1], slot[2])
+                and (days_worked_in_week.get(e.id, 0) < 5 or e.id in employees_working_today)
+            ]
             # Add None option to represent unassigned/coverage gap
             candidate_pools.append(matching_emps + [None])
         # Cartesian product of candidate pools
@@ -1139,6 +1186,10 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                     "start_min": f_start_min,
                     "end_min": f_end_min
                 })
+                
+            if emp.id not in employees_working_today:
+                employees_working_today.add(emp.id)
+                days_worked_in_week[emp.id] = days_worked_in_week.get(emp.id, 0) + 1
                 
             for r_start_min, r_end_min, r_desc in merged_restrictions:
                 pending_coverages.append((slot_name, r_start_min, r_end_min, r_desc, emp, role_req))

@@ -7,10 +7,11 @@ from models import SolicitudCambioTurno, HorarioTrabajador
 from schemas import SolicitudCambioTurnoCreate, SolicitudCambioTurnoRead, SolicitudCambioTurnoUpdate
 
 router = APIRouter(
-    prefix="/cambios-turno",
+    prefix="/api/cambios-turno",
     tags=["cambios-turno"],
 )
 
+@router.post("", response_model=SolicitudCambioTurnoRead)
 @router.post("/", response_model=SolicitudCambioTurnoRead)
 def create_cambio_turno(*, session: Session = Depends(get_session), solicitud: SolicitudCambioTurnoCreate):
     db_solicitud = SolicitudCambioTurno(
@@ -23,6 +24,7 @@ def create_cambio_turno(*, session: Session = Depends(get_session), solicitud: S
     session.refresh(db_solicitud)
     return db_solicitud
 
+@router.get("", response_model=List[SolicitudCambioTurnoRead])
 @router.get("/", response_model=List[SolicitudCambioTurnoRead])
 def read_cambios_turno(*, session: Session = Depends(get_session), estado: str = None):
     query = select(SolicitudCambioTurno)

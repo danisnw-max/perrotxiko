@@ -451,8 +451,9 @@ const SchedulerTab = ({
                             </div>
                           )}
                           {displayItems.map(item => {
+                            const displayName = item.empName.split(' ')[0]; // Show the first name
                             if (item.type === 'trabajo') {
-                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-indigo-950/30 border border-indigo-900/30 text-indigo-300 truncate" title={`Trabaja: ${item.empName}`}>🧑‍🍳 {item.initials}</div>;
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-indigo-950/30 border border-indigo-900/30 text-indigo-300 truncate" title={`Trabaja: ${item.empName}`}>🧑‍🍳 {displayName}</div>;
                             } else if (item.isUnassigned) {
                               return (
                                 <div 
@@ -465,15 +466,15 @@ const SchedulerTab = ({
                                 </div>
                               );
                             } else if (item.type === 'Vacaciones') {
-                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-950/30 border border-rose-900/30 text-rose-400 truncate" title={`Vacaciones: ${item.empName}`}>🔴 {item.initials}</div>;
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-950/30 border border-rose-900/30 text-rose-400 truncate" title={`Vacaciones: ${item.empName}`}>🔴 {displayName}</div>;
                             } else if (item.type === 'Libre Disposición') {
-                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-amber-950/30 border border-amber-900/30 text-amber-400 truncate" title={`Asuntos Propios: ${item.empName}`}>🟡 {item.initials}</div>;
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-amber-950/30 border border-amber-900/30 text-amber-400 truncate" title={`Asuntos Propios: ${item.empName}`}>🟡 {displayName}</div>;
                             } else if (item.type === 'Baja') {
-                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-900/30 border border-rose-800/40 text-rose-300 truncate" title={`Baja Médica: ${item.empName}`}>🩹 {item.initials}</div>;
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-900/30 border border-rose-800/40 text-rose-300 truncate" title={`Baja Médica: ${item.empName}`}>🩹 {displayName}</div>;
                             } else if (item.type === 'Permiso') {
-                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-blue-900/30 border border-blue-800/40 text-blue-300 truncate" title={`Permiso: ${item.empName}`}>📘 {item.initials}</div>;
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-blue-900/30 border border-blue-800/40 text-blue-300 truncate" title={`Permiso: ${item.empName}`}>📘 {displayName}</div>;
                             } else if (item.type === 'Libre') {
-                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-emerald-950/30 border border-emerald-900/30 text-emerald-400 truncate" title={`Día Libre: ${item.empName}`}>🌴 {item.initials}</div>;
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-emerald-950/30 border border-emerald-900/30 text-emerald-400 truncate" title={`Día Libre: ${item.empName}`}>🌴 {displayName}</div>;
                             }
                             return null;
                           })}

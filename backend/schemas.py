@@ -218,3 +218,22 @@ class TemporadaCreate(TemporadaBase):
 
 class TemporadaRead(TemporadaBase):
     pass
+
+class SolicitudCambioTurnoBase(BaseModel):
+    empleado_origen_id: str
+    empleado_destino_id: str
+    turno_origen_id: int
+    turno_destino_id: Optional[int] = None
+    notas: Optional[str] = ""
+
+class SolicitudCambioTurnoCreate(SolicitudCambioTurnoBase):
+    pass
+
+class SolicitudCambioTurnoRead(SolicitudCambioTurnoBase):
+    id: int
+    estado: str
+    fecha_solicitud: str
+
+class SolicitudCambioTurnoUpdate(BaseModel):
+    estado: str
+

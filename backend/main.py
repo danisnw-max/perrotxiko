@@ -134,3 +134,6 @@ app.include_router(empleados_router)
 app.include_router(incidencias_router)
 app.include_router(presencia_router)
 app.include_router(configuracion_router)
+
+from routers.cambios_turno import router as cambios_turno_router
+app.include_router(cambios_turno_router)

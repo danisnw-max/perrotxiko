@@ -1,5 +1,6 @@
 import React from 'react';
-import { CalendarRange, Sparkles, Users, Clock, CalendarDays, ChevronLeft, ChevronRight, Trash2, Store, FileText, AlertTriangle } from 'lucide-react';
+import { CalendarRange, Sparkles, Users, Clock, CalendarDays, ChevronLeft, ChevronRight, Trash2, Store, FileText, AlertTriangle, ArrowRightLeft } from 'lucide-react';
+import { api } from '../services/api';
 
 const SchedulerTab = ({
   selectedWeek,
@@ -34,8 +35,34 @@ const SchedulerTab = ({
   handleDeleteShift,
   setIsPresenceAuditModalOpen,
   setIsPrePayrollModalOpen,
+  showToast,
+  loadSchedules,
 }) => {
   const [monthlyFilter, setMonthlyFilter] = React.useState('trabajando'); // 'trabajando' or 'ausencias'
+  const [isSwapRequestsModalOpen, setIsSwapRequestsModalOpen] = React.useState(false);
+  const [swapRequests, setSwapRequests] = React.useState([]);
+
+  const fetchSwapRequests = async () => {
+    try {
+      const data = await api.get('/cambios-turno?estado=Pendiente');
+      setSwapRequests(data);
+      setIsSwapRequestsModalOpen(true);
+    } catch (e) {
+      showToast("Error al obtener solicitudes de cambio", "error");
+    }
+  };
+
+  const handleUpdateSwapStatus = async (id, status) => {
+    try {
+      await api.put(`/cambios-turno/${id}/estado`, { estado: status });
+      showToast(`Solicitud ${status === 'Aprobado' ? 'aprobada' : 'rechazada'} correctamente`, "success");
+      const data = await api.get('/cambios-turno?estado=Pendiente');
+      setSwapRequests(data);
+      loadSchedules();
+    } catch (e) {
+      showToast("Error al procesar la solicitud", "error");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -91,6 +118,13 @@ const SchedulerTab = ({
             className="py-2.5 px-4.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md flex items-center transition-all cursor-pointer"
           >
             <FileText size={14} className="mr-1.5 text-emerald-400"/> Pre-Nóminas
+          </button>
+
+          <button 
+            onClick={fetchSwapRequests} 
+            className="py-2.5 px-4.5 bg-slate-800 border border-slate-700 hover:bg-slate-750 text-indigo-400 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md flex items-center transition-all cursor-pointer"
+          >
+            <ArrowRightLeft size={14} className="mr-1.5"/> Cambios Turno
           </button>
         </div>
       </div>
@@ -488,6 +522,82 @@ const SchedulerTab = ({
           )}
         </div>
       </div>
+      {isSwapRequestsModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-2xl w-full flex flex-col text-left max-h-[85vh] shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-100 tracking-tight flex items-center gap-2">
+                <ArrowRightLeft className="text-indigo-400" size={20} />
+                Solicitudes de Cambio de Turno
+              </h3>
+              <button 
+                onClick={() => setIsSwapRequestsModalOpen(false)} 
+                className="p-2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 flex-1 overflow-y-auto pr-1 mb-6">
+              {swapRequests.map(req => {
+                const empOrigen = employees.find(e => e.id === req.empleado_origen_id);
+                const empDestino = employees.find(e => e.id === req.empleado_destino_id);
+                const shift = workSchedules.find(s => s.id === req.turno_origen_id);
+                
+                if (!empOrigen || !empDestino || !shift) return null;
+                
+                const dayName = new Date(shift.fecha).toLocaleDateString('es-ES', { weekday: 'long' });
+                const dateNum = new Date(shift.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+
+                return (
+                  <div key={req.id} className="p-4 bg-slate-950/40 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-slate-350 flex items-center gap-2">
+                        <span className="text-indigo-300 font-extrabold">{empOrigen.nombre}</span>
+                        <ArrowRightLeft size={10} className="text-slate-600" />
+                        <span className="text-emerald-300 font-extrabold">{empDestino.nombre}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 uppercase font-black">
+                        Turno a ceder: <span className="text-amber-400">{dayName} {dateNum} ({shift.turno} {shift.hora_inicio}-{shift.hora_fin})</span>
+                      </div>
+                      {req.notes && (
+                        <p className="text-[10px] text-slate-500 italic">"{req.notes}"</p>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-2 w-full sm:w-auto shrink-0">
+                      <button 
+                        onClick={() => handleUpdateSwapStatus(req.id, 'Aprobado')}
+                        className="flex-1 sm:flex-none py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                      >
+                        Aprobar
+                      </button>
+                      <button 
+                        onClick={() => handleUpdateSwapStatus(req.id, 'Rechazado')}
+                        className="flex-1 sm:flex-none py-2 px-4 bg-rose-650 hover:bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {swapRequests.length === 0 && (
+                <div className="py-12 text-center text-xs text-slate-500 italic font-bold">
+                  No hay solicitudes de cambio de turno pendientes de aprobación.
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={() => setIsSwapRequestsModalOpen(false)}
+              className="w-full py-3.5 bg-slate-850 hover:bg-slate-850/80 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border border-slate-750"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -151,3 +151,14 @@ class TurnoConfig(SQLModel, table=True):
     nombre: str = Field(index=True)  # Ej. "Mañana", "Tarde", "Noche"
     hora_inicio: str  # HH:MM
     hora_fin: str  # HH:MM
+
+class SolicitudCambioTurno(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    empleado_origen_id: str = Field(foreign_key="empleado.id")
+    empleado_destino_id: str = Field(foreign_key="empleado.id")
+    turno_origen_id: int = Field(foreign_key="horariotrabajador.id")
+    turno_destino_id: Optional[int] = Field(default=None, foreign_key="horariotrabajador.id")
+    estado: str = Field(default="Pendiente")  # Pendiente, Aprobado, Rechazado
+    fecha_solicitud: str = Field(index=True) # ISO format
+    notas: Optional[str] = Field(default="")
+

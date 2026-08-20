@@ -13,6 +13,7 @@ import IncidenciasEmpleadoModal from './components/modals/IncidenciasEmpleadoMod
 import PrePayrollModal from './components/modals/PrePayrollModal';
 import AuditoriaFichajesModal from './components/modals/AuditoriaFichajesModal';
 import ConfigWeeklyCalendar from './components/ConfigWeeklyCalendar';
+import QuioscoTab from './components/QuioscoTab';
 
 export default function App() {
   // Global States
@@ -774,6 +775,7 @@ export default function App() {
               { id: 'horarios', label: 'Planificador Horarios', icon: CalendarRange },
               { id: 'personal', label: 'Plantilla Personal', icon: Users },
               { id: 'configuracion', label: 'Configuración Bar', icon: Settings },
+              { id: 'quiosco', label: 'Quiosco Empleados', icon: CalendarDays },
             ].map(item => (
               <button
                 key={item.id}
@@ -928,6 +930,17 @@ export default function App() {
             handleDeleteShift={handleDeleteShift}
             setIsPresenceAuditModalOpen={setIsPresenceAuditModalOpen}
             setIsPrePayrollModalOpen={setIsPrePayrollModalOpen}
+            showToast={showToast}
+            loadSchedules={loadSchedules}
+          />
+        )}
+
+        {/* TAB: QUIOSCO EMPLEADOS */}
+        {activeTab === 'quiosco' && (
+          <QuioscoTab
+            employees={employees}
+            workSchedules={workSchedules}
+            showToast={showToast}
           />
         )}
 

@@ -66,6 +66,7 @@ export default function App() {
 
   // Employee Preferences & Restrictions Modal
   const [isEmployeePrefsModalOpen, setIsEmployeePrefsModalOpen] = useState(false);
+  const [isEmployeeHoursModalOpen, setIsEmployeeHoursModalOpen] = useState(false);
   const [selectedPrefsEmployee, setSelectedPrefsEmployee] = useState(null);
   const [restrictions, setRestrictions] = useState([]);
   const [employeeVacations, setEmployeeVacations] = useState([]);
@@ -315,19 +316,31 @@ export default function App() {
   // Summary logic of hours per employee
   const getWeeklyHoursSummary = () => {
     const summary = employees.filter(e => e.estado === 'Activo').map(emp => {
-      const days = getDaysOfWeek(selectedWeek);
-      const start = days[0].dateStr;
-      const end = days[6].dateStr;
+      let shiftsToCount = [];
+      let totalContract = emp.horas_semanales || 40.0;
       
-      const shifts = workSchedules.filter(s => s.empleado_id === emp.id && s.fecha >= start && s.fecha <= end && s.turno !== 'Baja' && s.turno !== 'Vacaciones' && s.turno !== 'Permiso' && s.turno !== 'Libre');
-      const schedHours = shifts.reduce((acc, curr) => acc + calculateShiftHours(curr.hora_inicio, curr.hora_fin), 0);
+      if (scheduleViewMode === 'monthly') {
+        const days = getDaysOfMonth(selectedWeek);
+        const start = days[0].dateStr;
+        const end = days[days.length - 1].dateStr;
+        shiftsToCount = workSchedules.filter(s => s.empleado_id === emp.id && s.fecha >= start && s.fecha <= end && !['Baja', 'Vacaciones', 'Permiso', 'Libre'].includes(s.turno));
+        // Scale contract up to match the number of weeks displayed
+        totalContract = parseFloat((totalContract * (days.length / 7.0)).toFixed(1));
+      } else {
+        const days = getDaysOfWeek(selectedWeek);
+        const start = days[0].dateStr;
+        const end = days[6].dateStr;
+        shiftsToCount = workSchedules.filter(s => s.empleado_id === emp.id && s.fecha >= start && s.fecha <= end && !['Baja', 'Vacaciones', 'Permiso', 'Libre'].includes(s.turno));
+      }
+      
+      const schedHours = shiftsToCount.reduce((acc, curr) => acc + calculateShiftHours(curr.hora_inicio, curr.hora_fin), 0);
       
       return {
         id: emp.id,
         name: emp.nombre,
         puesto: emp.puesto,
         scheduled: schedHours,
-        contract: emp.horas_semanales || 40.0
+        contract: totalContract
       };
     });
     return summary.sort((a, b) => b.scheduled - a.scheduled);
@@ -892,6 +905,7 @@ export default function App() {
             fetchFixedSchedules={fetchFixedSchedules}
             fetchEmployeeVacations={fetchEmployeeVacations}
             setIsEmployeePrefsModalOpen={setIsEmployeePrefsModalOpen}
+            setIsEmployeeHoursModalOpen={setIsEmployeeHoursModalOpen}
             storeHours={storeHours}
             workSchedules={workSchedules}
             festivos={festivos}
@@ -2319,6 +2333,80 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isEmployeeHoursModalOpen && selectedPrefsEmployee && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-md w-full flex flex-col text-left shadow-2xl">
+            <h3 className="text-xl font-black text-slate-100 tracking-tight mb-1">
+              Desglose de Horas: <span className="text-indigo-400">{selectedPrefsEmployee.nombre}</span>
+            </h3>
+            <p className="text-xs text-slate-400 font-bold mb-6 uppercase tracking-wider">
+              {new Date(selectedWeek).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
+            </p>
+
+            <div className="space-y-3 flex-1 mb-6">
+              {(() => {
+                const days = getDaysOfMonth(selectedWeek);
+                const weeks = [];
+                for (let i = 0; i < days.length; i += 7) {
+                  weeks.push(days.slice(i, i + 7));
+                }
+
+                let totalMonthHours = 0;
+
+                return (
+                  <div className="space-y-4">
+                    {weeks.map((week, idx) => {
+                      const start = week[0].dateStr;
+                      const end = week[week.length - 1].dateStr;
+                      
+                      const shifts = workSchedules.filter(s => 
+                        s.empleado_id === selectedPrefsEmployee.id && 
+                        s.fecha >= start && 
+                        s.fecha <= end && 
+                        !['Baja', 'Vacaciones', 'Permiso', 'Libre'].includes(s.turno)
+                      );
+                      
+                      const schedHours = shifts.reduce((acc, curr) => acc + calculateShiftHours(curr.hora_inicio, curr.hora_fin), 0);
+                      
+                      // Only add to total if the week actually has days in the current month? 
+                      // Or just total all weeks displayed in the grid (which might include a few days from prev/next month)
+                      // A typical payroll month is exactly what's shown in the month grid.
+                      totalMonthHours += schedHours;
+
+                      return (
+                        <div key={idx} className="flex justify-between items-center p-3.5 bg-slate-950/40 rounded-xl border border-slate-800">
+                          <div>
+                            <div className="font-bold text-slate-300 text-xs uppercase tracking-wider">Semana {idx + 1}</div>
+                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                              {new Date(start).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} - {new Date(end).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                            </div>
+                          </div>
+                          <div className={`font-black font-mono text-sm ${schedHours > (selectedPrefsEmployee.horas_semanales || 40) ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {schedHours.toFixed(1)}h
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-800 flex justify-between items-center">
+                      <div className="font-black text-slate-200 uppercase tracking-widest text-sm">Total del Mes</div>
+                      <div className="font-black font-mono text-indigo-400 text-xl">{totalMonthHours.toFixed(1)}h</div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            <button 
+              onClick={() => setIsEmployeeHoursModalOpen(false)} 
+              className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer border border-slate-700"
+            >
+              Cerrar
+            </button>
           </div>
         </div>
       )}

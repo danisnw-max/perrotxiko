@@ -22,6 +22,7 @@ const SchedulerTab = ({
   fetchFixedSchedules,
   fetchEmployeeVacations,
   setIsEmployeePrefsModalOpen,
+  setIsEmployeeHoursModalOpen,
   storeHours,
   workSchedules,
   festivos,
@@ -111,10 +112,7 @@ const SchedulerTab = ({
                     const fullEmp = employees.find(e => e.id === emp.id);
                     if (fullEmp) {
                       setSelectedPrefsEmployee(fullEmp);
-                      fetchEmployeeRestrictions(emp.id);
-                      fetchFixedSchedules(emp.id);
-                      fetchEmployeeVacations(emp.id);
-                      setIsEmployeePrefsModalOpen(true);
+                      setIsEmployeeHoursModalOpen(true);
                     }
                   }}
                   className="p-3.5 bg-slate-950/40 rounded-2xl border border-slate-800 hover:border-indigo-500/50 cursor-pointer transition-all space-y-2 text-left"

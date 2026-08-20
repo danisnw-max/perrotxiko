@@ -687,8 +687,17 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
     # Get fixed schedules
     all_fixed = session.exec(select(HorarioFijo)).all()
     fixed_by_emp_wday = {}
+    optional_by_emp_wday = {}
     for f in all_fixed:
-        fixed_by_emp_wday[(f.dia_semana, f.empleado_id)] = f
+        key = (f.dia_semana, f.empleado_id)
+        if f.tipo == "Opcional":
+            if key not in optional_by_emp_wday:
+                optional_by_emp_wday[key] = []
+            optional_by_emp_wday[key].append(f)
+        else:
+            if key not in fixed_by_emp_wday:
+                fixed_by_emp_wday[key] = []
+            fixed_by_emp_wday[key].append(f)
 
     # Day-by-day scheduling
     fixed_assignments = set()
@@ -722,8 +731,8 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         for emp in employees:
             if (date_str, emp.id) in vacaciones_by_date_emp:
                 continue
-            fixed = fixed_by_emp_wday.get((weekday, emp.id))
-            if fixed:
+            fixed_list = fixed_by_emp_wday.get((weekday, emp.id), [])
+            for fixed in fixed_list:
                 new_shift = HorarioTrabajador(
                     empleado_id=emp.id,
                     fecha=date_str,
@@ -857,7 +866,7 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                         return True
                 return False
 
-            def esta_disponible_dia(emp: Empleado, wday: int) -> bool:
+            def esta_disponible_dia(emp: Empleado, wday: int, slot_start_str: str, slot_end_str: str) -> bool:
                 if hasattr(emp, "dias_permitidos") and emp.dias_permitidos is not None:
                     try:
                         allowed_days = [int(d.strip()) for d in emp.dias_permitidos.split(",") if d.strip().isdigit()]
@@ -865,9 +874,21 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                             return False
                     except Exception:
                         pass
+                
+                # Check optional availability (if they have ANY optional entries for this day, they can ONLY work if the slot matches one)
+                opcionales = optional_by_emp_wday.get((wday, emp.id), [])
+                if opcionales:
+                    matches = False
+                    for opc in opcionales:
+                        if opc.hora_inicio == slot_start_str and opc.hora_fin == slot_end_str:
+                            matches = True
+                            break
+                    if not matches:
+                        return False
+
                 return True
                 
-            matching_emps = [e for e in employees if puede_cubrir_puesto(e, role_req) and e.estado == "Activo" and esta_disponible_dia(e, weekday)]
+            matching_emps = [e for e in employees if puede_cubrir_puesto(e, role_req) and e.estado == "Activo" and esta_disponible_dia(e, weekday, slot[1], slot[2])]
             # Add None option to represent unassigned/coverage gap
             candidate_pools.append(matching_emps + [None])
         # Cartesian product of candidate pools

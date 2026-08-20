@@ -82,6 +82,7 @@ class HorarioFijo(SQLModel, table=True):
     dia_semana: int  # 0=Lunes, 6=Domingo
     hora_inicio: str  # HH:MM
     hora_fin: str  # HH:MM
+    tipo: str = Field(default="Fijo")  # Fijo, Opcional
 
 class HorarioTrabajador(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

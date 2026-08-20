@@ -74,7 +74,7 @@ export default function App() {
   });
   const [fixedSchedules, setFixedSchedules] = useState([]);
   const [fixedScheduleForm, setFixedScheduleForm] = useState({
-    id: null, empleado_id: '', dia_semana: 0, hora_inicio: '09:00', hora_fin: '17:00'
+    id: null, empleado_id: '', dia_semana: 0, hora_inicio: '09:00', hora_fin: '17:00', tipo: 'Fijo'
   });
 
   // Manual Shift Add / Edit Modal
@@ -658,11 +658,11 @@ export default function App() {
     e.preventDefault();
     try {
       await api.post('/horarios-fijos', fixedScheduleForm);
-      showToast("Horario fijo guardado", "success");
-      setFixedScheduleForm({ id: null, empleado_id: selectedPrefsEmployee.id, dia_semana: 0, hora_inicio: '09:00', hora_fin: '17:00' });
+      showToast("Horario guardado", "success");
+      setFixedScheduleForm({ id: null, empleado_id: selectedPrefsEmployee.id, dia_semana: 0, hora_inicio: '09:00', hora_fin: '17:00', tipo: 'Fijo' });
       fetchFixedSchedules(selectedPrefsEmployee.id);
     } catch (err) {
-      showToast("Error al guardar horario fijo", "error");
+      showToast("Error al guardar horario", "error");
     }
   };
 
@@ -1526,6 +1526,9 @@ export default function App() {
                           {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][f.dia_semana]}
                         </span>
                         <span className="font-mono text-slate-400 ml-2">({f.hora_inicio} - {f.hora_fin})</span>
+                        <span className={`ml-2 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${f.tipo === 'Opcional' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                          {f.tipo === 'Opcional' ? 'Solo si se necesita' : 'Siempre Fijo'}
+                        </span>
                       </div>
                       
                       <button 
@@ -1637,6 +1640,18 @@ export default function App() {
                         required
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Tipo de Asignación</label>
+                    <select 
+                      value={fixedScheduleForm.tipo || 'Fijo'} 
+                      onChange={(e) => setFixedScheduleForm({...fixedScheduleForm, tipo: e.target.value})}
+                      className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none"
+                    >
+                      <option value="Fijo">Siempre Fijo (Se le asigna obligatoriamente cada semana)</option>
+                      <option value="Opcional">Opcional (El generador puede elegirlo si el bar lo necesita)</option>
+                    </select>
                   </div>
 
                   <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer">

@@ -72,6 +72,10 @@ export default function App() {
   const [restrictionForm, setRestrictionForm] = useState({
     id: null, empleado_id: '', fecha: '', hora_inicio: '', hora_fin: '', descripcion: ''
   });
+  const [fixedSchedules, setFixedSchedules] = useState([]);
+  const [fixedScheduleForm, setFixedScheduleForm] = useState({
+    id: null, empleado_id: '', dia_semana: 0, hora_inicio: '09:00', hora_fin: '17:00'
+  });
 
   // Manual Shift Add / Edit Modal
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
@@ -334,6 +338,15 @@ export default function App() {
     try {
       const data = await api.get(`/empleados/${empId}/restricciones`);
       setRestrictions(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const fetchFixedSchedules = async (empId) => {
+    try {
+      const data = await api.get(`/empleados/${empId}/horarios-fijos`);
+      setFixedSchedules(data);
     } catch (e) {
       console.error(e);
     }
@@ -641,6 +654,28 @@ export default function App() {
     }
   };
 
+  const handleSaveFixedSchedule = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/horarios-fijos', fixedScheduleForm);
+      showToast("Horario fijo guardado", "success");
+      setFixedScheduleForm({ id: null, empleado_id: selectedPrefsEmployee.id, dia_semana: 0, hora_inicio: '09:00', hora_fin: '17:00' });
+      fetchFixedSchedules(selectedPrefsEmployee.id);
+    } catch (err) {
+      showToast("Error al guardar horario fijo", "error");
+    }
+  };
+
+  const handleDeleteFixedSchedule = async (id) => {
+    try {
+      await api.delete(`/horarios-fijos/${id}`);
+      showToast("Horario fijo eliminado", "success");
+      fetchFixedSchedules(selectedPrefsEmployee.id);
+    } catch (e) {
+      showToast("Error al eliminar horario fijo", "error");
+    }
+  };
+
   const handleSaveTemporada = async (e) => {
     e.preventDefault();
     try {
@@ -854,6 +889,7 @@ export default function App() {
             getWeeklyHoursSummary={getWeeklyHoursSummary}
             setSelectedPrefsEmployee={setSelectedPrefsEmployee}
             fetchEmployeeRestrictions={fetchEmployeeRestrictions}
+            fetchFixedSchedules={fetchFixedSchedules}
             fetchEmployeeVacations={fetchEmployeeVacations}
             setIsEmployeePrefsModalOpen={setIsEmployeePrefsModalOpen}
             storeHours={storeHours}
@@ -965,6 +1001,7 @@ export default function App() {
                       onClick={() => {
                         setSelectedPrefsEmployee(emp);
                         fetchEmployeeRestrictions(emp.id);
+                        fetchFixedSchedules(emp.id);
                         fetchEmployeeVacations(emp.id);
                         setIsEmployeePrefsModalOpen(true);
                       }}
@@ -1479,6 +1516,31 @@ export default function App() {
                     <p className="text-xs text-slate-550 italic py-6">Sin restricciones puntuales de disponibilidad.</p>
                   )}
                 </div>
+
+                <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider mt-8 mb-4">Horarios Fijos Semanales</h4>
+                <div className="space-y-3">
+                  {fixedSchedules.map(f => (
+                    <div key={f.id} className="p-3.5 bg-slate-850 rounded-2xl border border-slate-800 flex justify-between items-center text-xs">
+                      <div>
+                        <span className="font-bold font-mono text-emerald-400">
+                          {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'][f.dia_semana]}
+                        </span>
+                        <span className="font-mono text-slate-400 ml-2">({f.hora_inicio} - {f.hora_fin})</span>
+                      </div>
+                      
+                      <button 
+                        onClick={() => handleDeleteFixedSchedule(f.id)}
+                        className="p-1 hover:text-rose-400 text-slate-500 transition-colors cursor-pointer"
+                        title="Eliminar horario fijo"
+                      >
+                        <Trash2 size={12}/>
+                      </button>
+                    </div>
+                  ))}
+                  {fixedSchedules.length === 0 && (
+                    <p className="text-xs text-slate-550 italic py-6">Sin horarios fijos asignados.</p>
+                  )}
+                </div>
               </div>
 
               {/* Right Column: Add Restriction Form */}
@@ -1531,6 +1593,54 @@ export default function App() {
 
                   <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer">
                     Guardar Restricción
+                  </button>
+                </form>
+
+                <form onSubmit={handleSaveFixedSchedule} className="space-y-4 mt-8">
+                  <h4 className="font-bold text-slate-200 text-xs uppercase tracking-wider pb-2 border-b border-slate-800">Añadir Horario Fijo</h4>
+                  
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Día de la semana</label>
+                    <select 
+                      value={fixedScheduleForm.dia_semana} 
+                      onChange={(e) => setFixedScheduleForm({...fixedScheduleForm, empleado_id: selectedPrefsEmployee.id, dia_semana: parseInt(e.target.value)})}
+                      className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none"
+                    >
+                      <option value={0}>Lunes</option>
+                      <option value={1}>Martes</option>
+                      <option value={2}>Miércoles</option>
+                      <option value={3}>Jueves</option>
+                      <option value={4}>Viernes</option>
+                      <option value={5}>Sábado</option>
+                      <option value={6}>Domingo</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Hora Inicio</label>
+                      <input 
+                        type="time" 
+                        value={fixedScheduleForm.hora_inicio} 
+                        onChange={(e) => setFixedScheduleForm({...fixedScheduleForm, hora_inicio: e.target.value})}
+                        className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Hora Fin</label>
+                      <input 
+                        type="time" 
+                        value={fixedScheduleForm.hora_fin} 
+                        onChange={(e) => setFixedScheduleForm({...fixedScheduleForm, hora_fin: e.target.value})}
+                        className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-900 text-xs font-bold text-slate-200 outline-none font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer">
+                    Añadir Horario Fijo
                   </button>
                 </form>
               </div>

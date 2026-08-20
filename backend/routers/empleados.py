@@ -21,7 +21,8 @@ from models import (
     CierreBar,
     SMTPConfig,
     TurnoConfig,
-    Temporada
+    Temporada,
+    HorarioFijo
 )
 from schemas import (
     EmpleadoRead,
@@ -403,6 +404,36 @@ def delete_restriccion(id: int, session: Session = Depends(get_session)):
     session.commit()
     return {"status": "success", "message": f"Restricción {id} eliminada correctamente"}
 
+# === HORARIOS FIJOS API ===
+
+@router.get("/api/empleados/{id}/horarios-fijos")
+def get_horarios_fijos(id: str, session: Session = Depends(get_session)):
+    return session.exec(select(HorarioFijo).where(HorarioFijo.empleado_id == id)).all()
+
+@router.post("/api/horarios-fijos")
+def save_horario_fijo(horario: HorarioFijo, session: Session = Depends(get_session)):
+    if horario.id:
+        db_horario = session.get(HorarioFijo, horario.id)
+        if db_horario:
+            for key, val in horario.dict(exclude_unset=True).items():
+                setattr(db_horario, key, val)
+            session.add(db_horario)
+            session.commit()
+            session.refresh(db_horario)
+            return db_horario
+    session.add(horario)
+    session.commit()
+    session.refresh(horario)
+    return horario
+
+@router.delete("/api/horarios-fijos/{id}")
+def delete_horario_fijo(id: int, session: Session = Depends(get_session)):
+    db_horario = session.get(HorarioFijo, id)
+    if not db_horario:
+        raise HTTPException(status_code=404, detail="Horario fijo no encontrado")
+    session.delete(db_horario)
+    session.commit()
+    return {"status": "success", "message": f"Horario fijo {id} eliminado"}
 
 # === GENERADOR HORARIOS API (ADAPTADO A BAR) ===
 @router.post("/api/horarios/generar-mes")
@@ -653,8 +684,15 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
             "start_min": start_min,
             "end_min": end_min
         })
+    # Get fixed schedules
+    all_fixed = session.exec(select(HorarioFijo)).all()
+    fixed_by_emp_wday = {}
+    for f in all_fixed:
+        fixed_by_emp_wday[(f.dia_semana, f.empleado_id)] = f
 
     # Day-by-day scheduling
+    fixed_assignments = set()
+
     for d in range(1, num_days + 1):
         curr_date = datetime(year, month, d)
         date_str = curr_date.strftime("%Y-%m-%d")
@@ -680,6 +718,28 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
 
         weekday = curr_date.weekday()  # 0=Monday, 6=Sunday
         
+        # Apply Fixed Schedules for this day
+        for emp in employees:
+            if (date_str, emp.id) in vacaciones_by_date_emp:
+                continue
+            fixed = fixed_by_emp_wday.get((weekday, emp.id))
+            if fixed:
+                new_shift = HorarioTrabajador(
+                    empleado_id=emp.id,
+                    fecha=date_str,
+                    turno="Personalizado",
+                    hora_inicio=fixed.hora_inicio,
+                    hora_fin=fixed.hora_fin,
+                    notas="Horario Fijo"
+                )
+                session.add(new_shift)
+                fixed_assignments.add((date_str, emp.id))
+                try:
+                    duration = calculate_shift_hours(fixed.hora_inicio, fixed.hora_fin)
+                    accumulated_minutes_this_month[emp.id] += duration * 60
+                except:
+                    pass
+                    
         # Resolve active Temporada for this day
         active_temp_id = get_temporada_id_for_date(date_str)
         
@@ -867,6 +927,12 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                 
                 # Check active vacations/leaves
                 if (date_str, emp.id) in vacaciones_by_date_emp:
+                    has_hard_blocker = True
+                    total_score -= 9999
+                    continue
+                    
+                # Check fixed assignments
+                if (date_str, emp.id) in fixed_assignments:
                     has_hard_blocker = True
                     total_score -= 9999
                     continue

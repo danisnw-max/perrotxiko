@@ -76,6 +76,13 @@ class RestriccionEmpleado(SQLModel, table=True):
     hora_fin: Optional[str] = None  # HH:MM
     descripcion: Optional[str] = None  # Ej. "Examen", "Médico"
 
+class HorarioFijo(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    empleado_id: str = Field(foreign_key="empleado.id", index=True)
+    dia_semana: int  # 0=Lunes, 6=Domingo
+    hora_inicio: str  # HH:MM
+    hora_fin: str  # HH:MM
+
 class HorarioTrabajador(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     empleado_id: str = Field(foreign_key="empleado.id") # Puede ser "" si es necesidad de cobertura "Sin Asignar"

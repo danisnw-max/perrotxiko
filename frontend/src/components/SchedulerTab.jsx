@@ -19,6 +19,7 @@ const SchedulerTab = ({
   getWeeklyHoursSummary,
   setSelectedPrefsEmployee,
   fetchEmployeeRestrictions,
+  fetchFixedSchedules,
   fetchEmployeeVacations,
   setIsEmployeePrefsModalOpen,
   storeHours,
@@ -111,6 +112,7 @@ const SchedulerTab = ({
                     if (fullEmp) {
                       setSelectedPrefsEmployee(fullEmp);
                       fetchEmployeeRestrictions(emp.id);
+                      fetchFixedSchedules(emp.id);
                       fetchEmployeeVacations(emp.id);
                       setIsEmployeePrefsModalOpen(true);
                     }

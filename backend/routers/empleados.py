@@ -883,10 +883,25 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                 opcionales = optional_by_emp_wday.get((wday, emp.id), [])
                 if opcionales:
                     matches = False
+                    slot_s_min = parse_time_to_minutes(slot_start_str)
+                    slot_e_min = parse_time_to_minutes(slot_end_str)
+                    if slot_e_min < slot_s_min: slot_e_min += 1440
+                    
                     for opc in opcionales:
+                        opc_s_min = parse_time_to_minutes(opc.hora_inicio)
+                        opc_e_min = parse_time_to_minutes(opc.hora_fin)
+                        if opc_e_min < opc_s_min: opc_e_min += 1440
+                        
+                        # Contained entirely within the optional block?
+                        if slot_s_min >= opc_s_min and slot_e_min <= opc_e_min:
+                            matches = True
+                            break
+                            
+                        # Or maybe just exact match for safety if overnight stuff gets weird
                         if opc.hora_inicio == slot_start_str and opc.hora_fin == slot_end_str:
                             matches = True
                             break
+                            
                     if not matches:
                         return False
 

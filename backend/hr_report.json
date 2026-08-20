@@ -1,0 +1,241 @@
+{
+  "empleados": [
+    {
+      "nombre": "Daniel",
+      "puesto": "Encargado",
+      "roles": "Sala,Barra",
+      "horas": 40.0,
+      "estado": "Activo"
+    },
+    {
+      "nombre": "Laura",
+      "puesto": "Encargado",
+      "roles": "Sala,Barra",
+      "horas": 30.0,
+      "estado": "Activo"
+    },
+    {
+      "nombre": "Samad",
+      "puesto": "Sala",
+      "roles": "",
+      "horas": 20.0,
+      "estado": "Activo"
+    },
+    {
+      "nombre": "Pier",
+      "puesto": "Barra",
+      "roles": "Sala",
+      "horas": 30.0,
+      "estado": "Activo"
+    },
+    {
+      "nombre": "Amaia",
+      "puesto": "Barra",
+      "roles": "Sala",
+      "horas": 20.0,
+      "estado": "Activo"
+    },
+    {
+      "nombre": "Alex",
+      "puesto": "Barra",
+      "roles": "Sala",
+      "horas": 25.0,
+      "estado": "Activo"
+    },
+    {
+      "nombre": "Mayi",
+      "puesto": "Barra",
+      "roles": "Sala",
+      "horas": 15.0,
+      "estado": "Activo"
+    }
+  ],
+  "coberturas": [
+    {
+      "dia": 0,
+      "turno": "Noche L-J",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 1,
+      "turno": "Noche L-J",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 2,
+      "turno": "Noche L-J",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 3,
+      "turno": "Noche L-J",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 0,
+      "turno": "Cenas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 1,
+      "turno": "Cenas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 2,
+      "turno": "Cenas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 3,
+      "turno": "Cenas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 5,
+      "turno": "Cenas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 6,
+      "turno": "Cenas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 4,
+      "turno": "Comidas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 5,
+      "turno": "Comidas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 6,
+      "turno": "Comidas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 0,
+      "turno": "Tarde L-J",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 1,
+      "turno": "Tarde L-J",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 2,
+      "turno": "Tarde L-J",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 3,
+      "turno": "Tarde L-J",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 4,
+      "turno": "Mañana V-S",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 5,
+      "turno": "Mañana V-S",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 4,
+      "turno": "Cenas",
+      "puesto": "Sala",
+      "cantidad": 1
+    },
+    {
+      "dia": 4,
+      "turno": "Tarde V-S",
+      "puesto": "Barra",
+      "cantidad": 2
+    },
+    {
+      "dia": 5,
+      "turno": "Tarde V-S",
+      "puesto": "Barra",
+      "cantidad": 2
+    },
+    {
+      "dia": 6,
+      "turno": "Mañana D",
+      "puesto": "Barra",
+      "cantidad": 1
+    },
+    {
+      "dia": 6,
+      "turno": "Tarde D",
+      "puesto": "Barra",
+      "cantidad": 1
+    }
+  ],
+  "turnos": [
+    {
+      "nombre": "Tarde L-J",
+      "inicio": "16:30",
+      "fin": "23:00"
+    },
+    {
+      "nombre": "Mañana V-S",
+      "inicio": "12:30",
+      "fin": "19:00"
+    },
+    {
+      "nombre": "Noche L-J",
+      "inicio": "19:00",
+      "fin": "01:30"
+    },
+    {
+      "nombre": "Tarde V-S",
+      "inicio": "19:00",
+      "fin": "02:30"
+    },
+    {
+      "nombre": "Mañana D",
+      "inicio": "12:30",
+      "fin": "17:30"
+    },
+    {
+      "nombre": "Tarde D",
+      "inicio": "17:30",
+      "fin": "01:30"
+    },
+    {
+      "nombre": "Comidas",
+      "inicio": "13:30",
+      "fin": "16:00"
+    },
+    {
+      "nombre": "Cenas",
+      "inicio": "19:30",
+      "fin": "22:30"
+    }
+  ]
+}

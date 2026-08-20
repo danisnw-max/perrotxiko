@@ -485,6 +485,21 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         .where(HorarioTrabajador.fecha >= start_date_str)
         .where(HorarioTrabajador.fecha <= end_date_str)
     ).all()
+
+    # Delete SolicitudCambioTurno records that reference these shifts to avoid IntegrityError (FK constraint)
+    shifts_to_delete_ids = [s.id for s in existing_shifts if s.turno not in ["Vacaciones", "Libre Disposición", "Baja", "Permiso"]]
+    if shifts_to_delete_ids:
+        from models import SolicitudCambioTurno
+        related_requests = session.exec(
+            select(SolicitudCambioTurno)
+            .where(
+                (SolicitudCambioTurno.turno_origen_id.in_(shifts_to_delete_ids)) |
+                (SolicitudCambioTurno.turno_destino_id.in_(shifts_to_delete_ids))
+            )
+        ).all()
+        for req in related_requests:
+            session.delete(req)
+        session.commit()
     
     vacaciones_by_date_emp = {}
     for s in existing_shifts:

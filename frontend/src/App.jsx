@@ -1751,12 +1751,11 @@ export default function App() {
             
             <div>
               <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Trabajador</label>
-              <select value={shiftForm.empleado_id} onChange={e => setShiftForm({...shiftForm, empleado_id: e.target.value})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-950/50 text-xs font-bold text-slate-200 outline-none" required>
-                <option value="">-- Selecciona --</option>
+              <select value={shiftForm.empleado_id} onChange={e => setShiftForm({...shiftForm, empleado_id: e.target.value})} className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-950/50 text-xs font-bold text-slate-200 outline-none">
+                <option value="">⚠️ Sin Asignar / Cobertura</option>
                 {employees.filter(e => e.estado === 'Activo').map(e => (
                   <option key={e.id} value={e.id}>{e.nombre} ({e.puesto})</option>
                 ))}
-                <option value="">⚠️ Sin Asignar / Cobertura</option>
               </select>
             </div>
 

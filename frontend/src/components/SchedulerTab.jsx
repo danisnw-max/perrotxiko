@@ -528,7 +528,7 @@ const SchedulerTab = ({
                     let displayItems = [];
                     if (monthlyFilter === 'trabajando') {
                         const workingEmps = [...new Set(dayShifts.filter(s => s.empleado_id && s.empleado_id !== '' && !['Vacaciones', 'Libre Disposición', 'Baja', 'Permiso', 'Festivo'].includes(s.turno)).map(s => s.empleado_id))];
-                        displayItems = workingEmps.map(empId => {
+                        const workers = workingEmps.map(empId => {
                             const emp = employees.find(e => e.id === empId);
                             const empName = emp?.nombre || '??';
                             return {
@@ -538,6 +538,16 @@ const SchedulerTab = ({
                                 initials: empName.split(' ').map(n => n[0]).join('').substring(0,3)
                             };
                         });
+                        
+                        const unassignedShifts = dayShifts.filter(s => !s.empleado_id || s.empleado_id === '').map(s => ({
+                            id: s.id,
+                            type: s.turno,
+                            empName: 'Sin Asignar',
+                            initials: 'SA',
+                            shift: s,
+                            isUnassigned: true
+                        }));
+                        displayItems = [...workers, ...unassignedShifts];
                     } else {
                         const dbAbsences = dayShifts.filter(s => ['Vacaciones', 'Libre Disposición', 'Baja', 'Permiso'].includes(s.turno) || !s.empleado_id || s.empleado_id === '').map(s => {
                             const isUnassigned = !s.empleado_id || s.empleado_id === '';

@@ -585,6 +585,21 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         m = mins % 60
         return f"{h:02d}:{m:02d}"
 
+    def puede_cubrir_puesto(emp: Empleado, req_puesto: str) -> bool:
+        rp = req_puesto.lower()
+        ep = emp.puesto.lower()
+        if ep == rp:
+            return True
+        if rp in ["sala", "camarero"] and ep in ["sala", "camarero"]:
+            return True
+        if hasattr(emp, "roles_adicionales") and emp.roles_adicionales:
+            additional_roles = [r.strip().lower() for r in emp.roles_adicionales.split(",") if r.strip()]
+            if rp in additional_roles:
+                return True
+            if rp in ["sala", "camarero"] and any(r in ["sala", "camarero"] for r in additional_roles):
+                return True
+        return False
+
     def get_slot_coverage(s_start_str, s_end_str, restrictions):
         slot_start = parse_time_to_minutes(s_start_str)
         slot_end = parse_time_to_minutes(s_end_str)
@@ -728,6 +743,7 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         weekday = curr_date.weekday()  # 0=Monday, 6=Sunday
         
         # Apply Fixed Schedules for this day
+        fixed_assignments_today = []
         for emp in employees:
             if (date_str, emp.id) in vacaciones_by_date_emp:
                 continue
@@ -743,6 +759,7 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                 )
                 session.add(new_shift)
                 fixed_assignments.add((date_str, emp.id))
+                fixed_assignments_today.append((emp, fixed.hora_inicio, fixed.hora_fin))
                 try:
                     duration = calculate_shift_hours(fixed.hora_inicio, fixed.hora_fin)
                     accumulated_minutes_this_month[emp.id] += duration * 60
@@ -817,6 +834,7 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                 slots.append(("Tarde", t_s, t_e, "Sala", 0, None))
                 slots.append(("Tarde", t_s, t_e, "Sala", 1, None))
         else:
+            used_fixed_emps = set() # Track globally for the day so they don't fulfill multiple slots
             for cob in day_coberturas:
                 c_name = cob.turno.lower()
                 c_hours = turnos_map.get(c_name, None)
@@ -830,7 +848,29 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
                         c_s, c_e = t_start, t_end
                         
                 if c_s and c_e:
-                    for idx in range(cob.cantidad):
+                    needed = cob.cantidad
+                    c_s_min = parse_time_to_minutes(c_s)
+                    c_e_min = parse_time_to_minutes(c_e)
+                    if c_e_min < c_s_min: c_e_min += 1440
+                    
+                    for f_emp, f_s, f_e in fixed_assignments_today:
+                        if f_emp.id in used_fixed_emps: continue
+                        if not puede_cubrir_puesto(f_emp, cob.puesto): continue
+                        
+                        f_s_min = parse_time_to_minutes(f_s)
+                        f_e_min = parse_time_to_minutes(f_e)
+                        if f_e_min < f_s_min: f_e_min += 1440
+                        
+                        overlap_s = max(c_s_min, f_s_min)
+                        overlap_e = min(c_e_min, f_e_min)
+                        
+                        # At least 1.5 hours of overlap to consider it covered
+                        if overlap_s < overlap_e and (overlap_e - overlap_s) >= 90:
+                            needed -= 1
+                            used_fixed_emps.add(f_emp.id)
+                            if needed <= 0: break
+                            
+                    for idx in range(max(0, needed)):
                         slots.append((cob.turno, c_s, c_e, cob.puesto, idx, cob.descripcion))
         
         if not slots:
@@ -855,21 +895,6 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         for slot in slots:
             role_req = slot[3]
             
-            def puede_cubrir_puesto(emp: Empleado, req_puesto: str) -> bool:
-                rp = req_puesto.lower()
-                ep = emp.puesto.lower()
-                if ep == rp:
-                    return True
-                if rp in ["sala", "camarero"] and ep in ["sala", "camarero"]:
-                    return True
-                if hasattr(emp, "roles_adicionales") and emp.roles_adicionales:
-                    additional_roles = [r.strip().lower() for r in emp.roles_adicionales.split(",") if r.strip()]
-                    if rp in additional_roles:
-                        return True
-                    if rp in ["sala", "camarero"] and any(r in ["sala", "camarero"] for r in additional_roles):
-                        return True
-                return False
-
             def esta_disponible_dia(emp: Empleado, wday: int, slot_start_str: str, slot_end_str: str) -> bool:
                 if hasattr(emp, "dias_permitidos") and emp.dias_permitidos is not None:
                     try:

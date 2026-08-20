@@ -35,6 +35,8 @@ const SchedulerTab = ({
   setIsPresenceAuditModalOpen,
   setIsPrePayrollModalOpen,
 }) => {
+  const [monthlyFilter, setMonthlyFilter] = React.useState('trabajando'); // 'trabajando' or 'ausencias'
+
   return (
     <div className="space-y-6">
       {/* Top Banner Control Panel */}
@@ -357,6 +359,24 @@ const SchedulerTab = ({
           ) : (
             /* Monthly Grid View */
             <div className="bg-slate-900/40 rounded-3xl border border-slate-800 p-5 shadow-sm overflow-x-auto">
+              <div className="flex justify-between items-center mb-4">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">Visualización Mensual</div>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setMonthlyFilter('trabajando')} 
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${monthlyFilter === 'trabajando' ? 'bg-indigo-650 text-white shadow-md' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                  >
+                    Trabajando
+                  </button>
+                  <button 
+                    onClick={() => setMonthlyFilter('ausencias')} 
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${monthlyFilter === 'ausencias' ? 'bg-indigo-650 text-white shadow-md' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                  >
+                    Vacaciones / Libres
+                  </button>
+                </div>
+              </div>
+              
               <div className="min-w-[800px]">
                 <div className="grid grid-cols-7 gap-3 mb-3">
                   {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map(d => (
@@ -366,7 +386,36 @@ const SchedulerTab = ({
                 <div className="grid grid-cols-7 gap-3">
                   {getDaysOfMonth(new Date(new Date(selectedWeek).setDate(new Date(selectedWeek).getDate() + 6)).toISOString().split('T')[0]).map(day => {
                     const dayFestivo = festivos.find(f => f.fecha === day.dateStr);
-                    const dayAbsences = workSchedules.filter(s => s.fecha === day.dateStr && (s.turno === 'Vacaciones' || s.turno === 'Libre Disposición' || s.turno === 'Baja' || s.turno === 'Permiso' || !s.empleado_id || s.empleado_id === ''));
+                    const dayShifts = workSchedules.filter(s => s.fecha === day.dateStr);
+                    
+                    let displayItems = [];
+                    if (monthlyFilter === 'trabajando') {
+                        const workingEmps = [...new Set(dayShifts.filter(s => s.empleado_id && s.empleado_id !== '' && !['Vacaciones', 'Libre Disposición', 'Baja', 'Permiso', 'Festivo'].includes(s.turno)).map(s => s.empleado_id))];
+                        displayItems = workingEmps.map(empId => {
+                            const emp = employees.find(e => e.id === empId);
+                            const empName = emp?.nombre || '??';
+                            return {
+                                id: 'work-' + empId,
+                                type: 'trabajo',
+                                empName,
+                                initials: empName.split(' ').map(n => n[0]).join('').substring(0,3)
+                            };
+                        });
+                    } else {
+                        displayItems = dayShifts.filter(s => ['Vacaciones', 'Libre Disposición', 'Baja', 'Permiso'].includes(s.turno) || !s.empleado_id || s.empleado_id === '').map(s => {
+                            const isUnassigned = !s.empleado_id || s.empleado_id === '';
+                            const emp = employees.find(e => e.id === s.empleado_id);
+                            const empName = isUnassigned ? 'Sin Asignar' : (emp?.nombre || '??');
+                            return {
+                                id: s.id,
+                                type: s.turno,
+                                empName,
+                                initials: empName.split(' ').map(n => n[0]).join('').substring(0,3),
+                                shift: s,
+                                isUnassigned
+                            };
+                        });
+                    }
                     
                     return (
                       <div 
@@ -386,31 +435,28 @@ const SchedulerTab = ({
                               {dayFestivo.descripcion}
                             </div>
                           )}
-                          {dayAbsences.map(s => {
-                            const isUnassigned = !s.empleado_id || s.empleado_id === '';
-                            const emp = employees.find(e => e.id === s.empleado_id);
-                            const empName = isUnassigned ? 'Sin Asignar' : (emp?.nombre || '??');
-                            const initials = empName.split(' ').map(n => n[0]).join('').substring(0,3);
-                            
-                            if (isUnassigned) {
+                          {displayItems.map(item => {
+                            if (item.type === 'trabajo') {
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-indigo-950/30 border border-indigo-900/30 text-indigo-300 truncate" title={`Trabaja: ${item.empName}`}>🧑‍🍳 {item.initials}</div>;
+                            } else if (item.isUnassigned) {
                               return (
                                 <div 
-                                  key={s.id} 
-                                  onClick={() => { setShiftForm(s); setIsShiftModalOpen(true); }} 
+                                  key={item.id} 
+                                  onClick={() => { setShiftForm(item.shift); setIsShiftModalOpen(true); }} 
                                   className="cursor-pointer text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-950 border border-rose-900/50 text-rose-400 truncate animate-pulse" 
-                                  title={`Necesidad Cobertura Sin Asignar: ${s.hora_inicio}-${s.hora_fin}`}
+                                  title={`Necesidad Cobertura Sin Asignar: ${item.shift.hora_inicio}-${item.shift.hora_fin}`}
                                 >
-                                  ⚠️ {s.hora_inicio}
+                                  ⚠️ {item.shift.hora_inicio}
                                 </div>
                               );
-                            } else if (s.turno === 'Vacaciones') {
-                              return <div key={s.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-950/30 border border-rose-900/30 text-rose-400 truncate" title={`Vacaciones: ${empName}`}>🔴 {initials}</div>;
-                            } else if (s.turno === 'Libre Disposición') {
-                              return <div key={s.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-amber-950/30 border border-amber-900/30 text-amber-400 truncate" title={`Asuntos Propios: ${empName}`}>🟡 {initials}</div>;
-                            } else if (s.turno === 'Baja') {
-                              return <div key={s.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-900/30 border border-rose-800/40 text-rose-300 truncate" title={`Baja Médica: ${empName}`}>🩹 {initials}</div>;
-                            } else if (s.turno === 'Permiso') {
-                              return <div key={s.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-blue-900/30 border border-blue-800/40 text-blue-300 truncate" title={`Permiso: ${empName}`}>📘 {initials}</div>;
+                            } else if (item.type === 'Vacaciones') {
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-950/30 border border-rose-900/30 text-rose-400 truncate" title={`Vacaciones: ${item.empName}`}>🔴 {item.initials}</div>;
+                            } else if (item.type === 'Libre Disposición') {
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-amber-950/30 border border-amber-900/30 text-amber-400 truncate" title={`Asuntos Propios: ${item.empName}`}>🟡 {item.initials}</div>;
+                            } else if (item.type === 'Baja') {
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-900/30 border border-rose-800/40 text-rose-300 truncate" title={`Baja Médica: ${item.empName}`}>🩹 {item.initials}</div>;
+                            } else if (item.type === 'Permiso') {
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-blue-900/30 border border-blue-800/40 text-blue-300 truncate" title={`Permiso: ${item.empName}`}>📘 {item.initials}</div>;
                             }
                             return null;
                           })}

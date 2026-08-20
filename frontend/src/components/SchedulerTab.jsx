@@ -402,7 +402,7 @@ const SchedulerTab = ({
                             };
                         });
                     } else {
-                        displayItems = dayShifts.filter(s => ['Vacaciones', 'Libre Disposición', 'Baja', 'Permiso'].includes(s.turno) || !s.empleado_id || s.empleado_id === '').map(s => {
+                        const dbAbsences = dayShifts.filter(s => ['Vacaciones', 'Libre Disposición', 'Baja', 'Permiso'].includes(s.turno) || !s.empleado_id || s.empleado_id === '').map(s => {
                             const isUnassigned = !s.empleado_id || s.empleado_id === '';
                             const emp = employees.find(e => e.id === s.empleado_id);
                             const empName = isUnassigned ? 'Sin Asignar' : (emp?.nombre || '??');
@@ -415,6 +415,21 @@ const SchedulerTab = ({
                                 isUnassigned
                             };
                         });
+                        
+                        // Calculate implicit days off
+                        const empsWithShiftToday = new Set(dayShifts.filter(s => s.empleado_id).map(s => s.empleado_id));
+                        const offEmps = employees.filter(e => e.estado === 'Activo' && e.horas_semanales > 0 && !empsWithShiftToday.has(e.id)).map(emp => {
+                            const empName = emp.nombre || '??';
+                            return {
+                                id: 'off-' + emp.id,
+                                type: 'Libre',
+                                empName,
+                                initials: empName.split(' ').map(n => n[0]).join('').substring(0,3),
+                                isUnassigned: false
+                            };
+                        });
+                        
+                        displayItems = [...dbAbsences, ...offEmps];
                     }
                     
                     return (
@@ -457,6 +472,8 @@ const SchedulerTab = ({
                               return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-rose-900/30 border border-rose-800/40 text-rose-300 truncate" title={`Baja Médica: ${item.empName}`}>🩹 {item.initials}</div>;
                             } else if (item.type === 'Permiso') {
                               return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-blue-900/30 border border-blue-800/40 text-blue-300 truncate" title={`Permiso: ${item.empName}`}>📘 {item.initials}</div>;
+                            } else if (item.type === 'Libre') {
+                              return <div key={item.id} className="text-[8px] font-bold py-0.5 px-1.5 rounded bg-emerald-950/30 border border-emerald-900/30 text-emerald-400 truncate" title={`Día Libre: ${item.empName}`}>🌴 {item.initials}</div>;
                             }
                             return null;
                           })}

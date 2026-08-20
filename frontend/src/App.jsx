@@ -2354,8 +2354,9 @@ export default function App() {
             <h3 className="text-xl font-black text-slate-100 tracking-tight mb-1">
               Desglose de Horas: <span className="text-indigo-400">{selectedPrefsEmployee.nombre}</span>
             </h3>
-            <p className="text-xs text-slate-400 font-bold mb-6 uppercase tracking-wider">
-              {new Date(new Date(selectedWeek).setDate(new Date(selectedWeek).getDate() + 6)).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
+            <p className="text-xs text-slate-400 font-bold mb-6 uppercase tracking-wider flex justify-between">
+              <span>{new Date(new Date(selectedWeek).setDate(new Date(selectedWeek).getDate() + 6)).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}</span>
+              <span className="text-indigo-400/80">Acumulado Anual: {selectedPrefsEmployee.horas_realizadas_anio}h / {(selectedPrefsEmployee.horas_semanales || 40) * 45}h</span>
             </p>
 
             <div className="space-y-3 flex-1 mb-6">

@@ -279,14 +279,18 @@ def save_coberturas_dia(req: CoberturaDiaBatchRequest, session: Session = Depend
             continue
             
         clean_turno = s.turno.replace(" (Cobertura)", "").strip()
-        puesto = "Sala"
-        if s.empleado_id and s.empleado_id in employees_map:
-            puesto = employees_map[s.empleado_id].puesto
-        elif s.notas:
+        puesto = None
+        if s.notas:
             for p in ["Sala", "Barra", "Cocinero", "Encargado", "Limpieza"]:
                 if p.lower() in s.notas.lower():
                     puesto = p
                     break
+        
+        if not puesto:
+            if s.empleado_id and s.empleado_id in employees_map:
+                puesto = employees_map[s.empleado_id].puesto
+            else:
+                puesto = "Sala"
                     
         key = (clean_turno, puesto)
         if key not in grouped_shifts:

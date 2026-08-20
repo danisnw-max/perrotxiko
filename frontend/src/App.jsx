@@ -84,6 +84,8 @@ export default function App() {
   const [shiftForm, setShiftForm] = useState({
     id: null, empleado_id: '', fecha: '', turno: 'Mañana', hora_inicio: '09:00', hora_fin: '16:00', notas: ''
   });
+  const [candidates, setCandidates] = useState([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
 
   // Bar Hours Modal
   const [isStoreHoursModalOpen, setIsStoreHoursModalOpen] = useState(false);
@@ -170,6 +172,40 @@ export default function App() {
       showToast("Error al cargar turnos", "error");
     }
   };
+
+  const fetchCandidates = async (shiftId) => {
+    if (!shiftId) return;
+    setIsLoadingCandidates(true);
+    try {
+      const res = await api.get(`/horarios/${shiftId}/candidatos-validos`);
+      setCandidates(res.candidatos || []);
+    } catch (e) {
+      console.error(e);
+      showToast("Error al obtener candidatos", "error");
+    } finally {
+      setIsLoadingCandidates(false);
+    }
+  };
+
+  const handleAutoAssign = async (shiftId) => {
+    if (!shiftId) return;
+    try {
+      const res = await api.post(`/horarios/${shiftId}/auto-asignar`);
+      showToast(res.message, "success");
+      setIsShiftModalOpen(false);
+      loadSchedules();
+    } catch (e) {
+      showToast(e.response?.data?.detail || "No hay candidatos disponibles que cumplan las condiciones", "error");
+    }
+  };
+
+  useEffect(() => {
+    if (isShiftModalOpen && shiftForm.id) {
+      fetchCandidates(shiftForm.id);
+    } else {
+      setCandidates([]);
+    }
+  }, [isShiftModalOpen, shiftForm.id]);
 
   const loadConfig = async () => {
     try {
@@ -1708,7 +1744,7 @@ export default function App() {
       {/* 8. Manual Shift Modal */}
       {isShiftModalOpen && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSaveShift} className="bg-slate-900 border border-slate-800 p-6 rounded-[28px] max-w-sm w-full space-y-4 text-left">
+          <form onSubmit={handleSaveShift} className="bg-slate-900 border border-slate-800 p-6 rounded-[28px] max-w-md w-full space-y-4 text-left">
             <h3 className="text-lg font-black text-slate-100 tracking-tight">
               {shiftForm.id ? 'Editar Turno' : 'Asignar Nuevo Turno'}
             </h3>
@@ -1750,6 +1786,53 @@ export default function App() {
               <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Notas del Turno</label>
               <input type="text" value={shiftForm.notas || ''} onChange={e => setShiftForm({...shiftForm, notas: e.target.value})} placeholder="Ej. Refuerzo de terraza, Cocina..." className="w-full border border-slate-750 p-2.5 rounded-xl bg-slate-950/50 text-xs font-bold text-slate-200 outline-none"/>
             </div>
+
+            {shiftForm.id && (
+              <div className="border-t border-slate-850 pt-3 mt-1 space-y-2">
+                <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                  Candidatos Disponibles (Condiciones OK)
+                </label>
+                
+                {isLoadingCandidates ? (
+                  <p className="text-[10px] text-slate-500 italic">Buscando empleados disponibles...</p>
+                ) : candidates.length > 0 ? (
+                  <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                    <button
+                      type="button"
+                      onClick={() => handleAutoAssign(shiftForm.id)}
+                      className="w-full py-1.5 mb-1 bg-emerald-650 hover:bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer flex items-center justify-center gap-1 shadow"
+                    >
+                      ⚡ Auto-Asignar Mejor Candidato
+                    </button>
+                    
+                    {candidates.map(c => (
+                      <button
+                        type="button"
+                        key={c.id}
+                        onClick={() => setShiftForm({...shiftForm, empleado_id: c.id})}
+                        className={`flex justify-between items-center text-[10px] p-2 border rounded-xl text-left cursor-pointer transition-all w-full ${
+                          shiftForm.empleado_id === c.id
+                            ? 'bg-indigo-950/40 border-indigo-500/50 text-indigo-300'
+                            : 'bg-slate-950/40 border-slate-850 hover:bg-slate-900/30 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <div>
+                          <span className="font-extrabold">{c.nombre}</span>
+                          <span className="text-slate-500 font-bold ml-1">({c.puesto})</span>
+                        </div>
+                        <div className="text-[9px] font-bold text-slate-500 font-mono">
+                          {c.horas_semanales_actuales.toFixed(1)}h / {c.horas_contrato}h ({c.dias_trabajados_semana}d)
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[9px] text-rose-450 font-bold bg-rose-950/20 border border-rose-900/30 p-2 rounded-xl">
+                    ⚠️ Ningún empleado activo cumple las condiciones para este puesto y horario.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2 pt-2">
               <button type="submit" className="flex-1 py-3 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg flex items-center justify-center transition-all cursor-pointer">

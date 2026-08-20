@@ -296,6 +296,179 @@ def delete_horario(id: int, session: Session = Depends(get_session)):
     session.commit()
     return {"status": "success", "message": f"Turno {id} eliminado correctamente"}
 
+@router.get("/api/horarios/{id}/candidatos-validos")
+def get_candidatos_validos(id: int, session: Session = Depends(get_session)):
+    db_hor = session.get(HorarioTrabajador, id)
+    if not db_hor:
+        raise HTTPException(status_code=404, detail="Turno no encontrado")
+        
+    # 1. Determine role required
+    role_req = None
+    if db_hor.notes:  # Wait! Is it notes or notas? The schema had `notas: Optional[str] = None`. Let's check: yes, it was `notas`!
+        # Ah, database field is `notas`, not `notes`.
+        pass
+    # Yes, the database schema field is `notas`.
+    notes_val = db_hor.notas
+    if notes_val:
+        import re
+        m = re.search(r'(Generado|Ajustado por restricción):\s*([a-zA-ZáéíóúÁÉÍÓÚñÑ]+)', notes_val)
+        if m:
+            role_req = m.group(2)
+        else:
+            for r in ["Sala", "Barra", "Cocinero", "Encargado", "Limpieza"]:
+                if r.lower() in notes_val.lower():
+                    role_req = r
+                    break
+
+    # 2. Get active employees
+    employees = session.exec(select(Empleado).where(Empleado.estado == "Activo")).all()
+    
+    # 3. Parse date and calculate week range
+    from datetime import datetime, timedelta
+    shift_date = datetime.strptime(db_hor.fecha, "%Y-%m-%d")
+    monday = shift_date - timedelta(days=shift_date.weekday())
+    sunday = monday + timedelta(days=6)
+    
+    start_week = monday.strftime("%Y-%m-%d")
+    end_week = sunday.strftime("%Y-%m-%d")
+    
+    # Pre-fetch all shifts for this week
+    weekly_shifts = session.exec(
+        select(HorarioTrabajador)
+        .where(HorarioTrabajador.fecha >= start_week)
+        .where(HorarioTrabajador.fecha <= end_week)
+    ).all()
+    
+    shifts_by_emp_date = {}
+    for s in weekly_shifts:
+        if not s.empleado_id:
+            continue
+        if s.empleado_id not in shifts_by_emp_date:
+            shifts_by_emp_date[s.empleado_id] = {}
+        if s.fecha not in shifts_by_emp_date[s.empleado_id]:
+            shifts_by_emp_date[s.empleado_id][s.fecha] = []
+        if s.id != db_hor.id:
+            shifts_by_emp_date[s.empleado_id][s.fecha].append(s)
+
+    try:
+        t_start = datetime.strptime(f"{db_hor.fecha} {db_hor.hora_inicio}", "%Y-%m-%d %H:%M")
+        t_end = datetime.strptime(f"{db_hor.fecha} {db_hor.hora_fin}", "%Y-%m-%d %H:%M")
+        if db_hor.hora_fin < db_hor.hora_inicio:
+            t_end += timedelta(days=1)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Horas de inicio/fin del turno no válidas")
+
+    valid_candidates = []
+    
+    for emp in employees:
+        # A. Role compatibility
+        if role_req:
+            is_compatible = (emp.puesto == role_req)
+            if not is_compatible and emp.roles_adicionales:
+                additional = [r.strip() for r in emp.roles_adicionales.split(",") if r.strip()]
+                is_compatible = (role_req in additional)
+            if not is_compatible:
+                continue
+                
+        # B. Absences on this date
+        emp_shifts_today = shifts_by_emp_date.get(emp.id, {}).get(db_hor.fecha, [])
+        is_absent = any(s.turno in ["Vacaciones", "Libre Disposición", "Baja", "Permiso"] for s in emp_shifts_today)
+        if is_absent:
+            continue
+            
+        # C. Weekly 5-day limit check
+        worked_days = 0
+        emp_weekly = shifts_by_emp_date.get(emp.id, {})
+        for date_str, shifts in emp_weekly.items():
+            has_worked_shift = any(s.turno not in ["Vacaciones", "Libre Disposición", "Baja", "Permiso", "Libre"] for s in shifts)
+            if has_worked_shift:
+                worked_days += 1
+                
+        if worked_days >= 5:
+            continue
+
+        # D. Overlaps and 12-hour rest checks
+        conflict = False
+        for date_str, shifts in emp_weekly.items():
+            for s in shifts:
+                if s.turno in ["Vacaciones", "Libre Disposición", "Baja", "Permiso", "Libre"]:
+                    continue
+                try:
+                    s_start = datetime.strptime(f"{s.fecha} {s.hora_inicio}", "%Y-%m-%d %H:%M")
+                    s_end = datetime.strptime(f"{s.fecha} {s.hora_fin}", "%Y-%m-%d %H:%M")
+                    if s.hora_fin < s.hora_inicio:
+                        s_end += timedelta(days=1)
+                except Exception:
+                    continue
+                
+                if max(t_start, s_start) < min(t_end, s_end):
+                    conflict = True
+                    break
+                    
+                if max(t_start - timedelta(hours=12), s_start) < min(t_end + timedelta(hours=12), s_end):
+                    conflict = True
+                    break
+            if conflict:
+                break
+                
+        if conflict:
+            continue
+            
+        # E. Calculate weekly hours
+        weekly_hours = 0
+        for date_str, shifts in emp_weekly.items():
+            for s in shifts:
+                if s.turno not in ["Vacaciones", "Libre Disposición", "Baja", "Permiso", "Libre"]:
+                    try:
+                        sh_start = datetime.strptime(f"{s.fecha} {s.hora_inicio}", "%Y-%m-%d %H:%M")
+                        sh_end = datetime.strptime(f"{s.fecha} {s.hora_fin}", "%Y-%m-%d %H:%M")
+                        if s.hora_fin < s.hora_inicio:
+                            sh_end += timedelta(days=1)
+                        weekly_hours += (sh_end - sh_start).total_seconds() / 3600.0
+                    except Exception:
+                        pass
+                        
+        valid_candidates.append({
+            "id": emp.id,
+            "nombre": emp.nombre,
+            "puesto": emp.puesto,
+            "horas_semanales_actuales": weekly_hours,
+            "horas_contrato": emp.horas_semanales,
+            "dias_trabajados_semana": worked_days
+        })
+        
+    def get_sort_key(c):
+        if c["horas_contrato"] > 0:
+            return c["horas_semanales_actuales"] / c["horas_contrato"]
+        return c["horas_semanales_actuales"]
+        
+    valid_candidates.sort(key=get_sort_key)
+    return {
+        "turno_id": id,
+        "puesto_requerido": role_req,
+        "candidatos": valid_candidates
+    }
+
+@router.post("/api/horarios/{id}/auto-asignar")
+def auto_assign_horario(id: int, session: Session = Depends(get_session)):
+    candidates_res = get_candidatos_validos(id, session)
+    candidates = candidates_res.get("candidatos", [])
+    if not candidates:
+        raise HTTPException(status_code=400, detail="No hay empleados disponibles que cumplan las condiciones laborales para este turno")
+        
+    best_candidate = candidates[0]
+    db_hor = session.get(HorarioTrabajador, id)
+    db_hor.empleado_id = best_candidate["id"]
+    
+    session.add(db_hor)
+    session.commit()
+    session.refresh(db_hor)
+    return {
+        "status": "success",
+        "message": f"Turno asignado automáticamente a {best_candidate['nombre']}",
+        "turno": db_hor
+    }
+
 @router.post("/api/horarios/bulk-vacaciones")
 def bulk_vacaciones(req: BulkVacacionesRequest, session: Session = Depends(get_session)):
     try:

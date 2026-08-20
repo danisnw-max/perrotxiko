@@ -149,9 +149,19 @@ export default function App() {
   const loadSchedules = async () => {
     try {
       // Load schedules for selected month/week
-      const d = new Date(selectedWeek);
-      const start = new Date(d.setDate(d.getDate() - 15)).toISOString().split('T')[0];
-      const end = new Date(d.setDate(d.getDate() + 45)).toISOString().split('T')[0];
+      const d1 = new Date(selectedWeek);
+      d1.setDate(d1.getDate() - 20);
+      const start = d1.toISOString().split('T')[0];
+      
+      const d2 = new Date(selectedWeek);
+      if (scheduleViewMode === 'monthly') {
+        d2.setMonth(d2.getMonth() + 1);
+        d2.setDate(d2.getDate() + 15);
+      } else {
+        d2.setDate(d2.getDate() + 20);
+      }
+      const end = d2.toISOString().split('T')[0];
+      
       const data = await api.get(`/horarios?fecha_inicio=${start}&fecha_fin=${end}`);
       setWorkSchedules(data);
     } catch (e) {
@@ -320,7 +330,8 @@ export default function App() {
       let totalContract = emp.horas_semanales || 40.0;
       
       if (scheduleViewMode === 'monthly') {
-        const days = getDaysOfMonth(selectedWeek);
+        const targetDateStr = new Date(new Date(selectedWeek).setDate(new Date(selectedWeek).getDate() + 6)).toISOString().split('T')[0];
+        const days = getDaysOfMonth(targetDateStr);
         const start = days[0].dateStr;
         const end = days[days.length - 1].dateStr;
         shiftsToCount = workSchedules.filter(s => s.empleado_id === emp.id && s.fecha >= start && s.fecha <= end && !['Baja', 'Vacaciones', 'Permiso', 'Libre'].includes(s.turno));
@@ -2344,12 +2355,14 @@ export default function App() {
               Desglose de Horas: <span className="text-indigo-400">{selectedPrefsEmployee.nombre}</span>
             </h3>
             <p className="text-xs text-slate-400 font-bold mb-6 uppercase tracking-wider">
-              {new Date(selectedWeek).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
+              {new Date(new Date(selectedWeek).setDate(new Date(selectedWeek).getDate() + 6)).toLocaleString('es-ES', { month: 'long', year: 'numeric' })}
             </p>
 
             <div className="space-y-3 flex-1 mb-6">
               {(() => {
-                const days = getDaysOfMonth(selectedWeek);
+                // Ensure we get the days for the month that the week belongs to
+                const targetDateStr = new Date(new Date(selectedWeek).setDate(new Date(selectedWeek).getDate() + 6)).toISOString().split('T')[0];
+                const days = getDaysOfMonth(targetDateStr);
                 const weeks = [];
                 for (let i = 0; i < days.length; i += 7) {
                   weeks.push(days.slice(i, i + 7));

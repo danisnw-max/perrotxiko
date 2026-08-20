@@ -842,10 +842,14 @@ def generar_horario_mes(req: GenerarHorarioRequest, session: Session = Depends(g
         emp_balancing_bonus = {}
         total_days = days_before_month + d - 1
         for emp in employees:
+            if emp.horas_semanales <= 0:
+                emp_balancing_bonus[emp.id] = 0
+                continue
             target_minutes = (emp.horas_semanales / 7.0) * total_days * 60.0
             actual_minutes = (ytd_hours[emp.id] * 60.0) + accumulated_minutes_this_month[emp.id]
             deviation_hours = (actual_minutes - target_minutes) / 60.0
-            emp_balancing_bonus[emp.id] = -deviation_hours * 2.0  # Under-contract gets positive bonus
+            # Normalize the deviation by their contract hours so part-time workers don't get starved
+            emp_balancing_bonus[emp.id] = - (deviation_hours / emp.horas_semanales) * 100.0
 
         candidate_pools = []
         for slot in slots:

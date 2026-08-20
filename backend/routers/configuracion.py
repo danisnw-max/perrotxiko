@@ -236,7 +236,114 @@ def save_coberturas_dia(req: CoberturaDiaBatchRequest, session: Session = Depend
             session.add(db_cob)
     
     session.commit()
-    return {"status": "success", "message": f"Coberturas actualizadas para el día {req.fecha}"}
+
+    # 3. Synchronize HorarioTrabajador shifts for this date
+    from models import HorarioTrabajador, Empleado
+    from datetime import datetime
+    
+    # Determine the effective coverages to sync against
+    effective_coberturas = []
+    if not req.coberturas:
+        d = datetime.strptime(req.fecha, "%Y-%m-%d")
+        weekday = d.weekday()
+        generic_cobs = session.exec(
+            select(CoberturaRequerida)
+            .where(CoberturaRequerida.dia_semana == weekday)
+            .where((CoberturaRequerida.fecha == None) | (CoberturaRequerida.fecha == ""))
+        ).all()
+        for gc in generic_cobs:
+            effective_coberturas.append(CoberturaDiaItem(
+                turno=gc.turno,
+                puesto=gc.puesto,
+                cantidad=gc.cantidad,
+                descripcion="Plantilla habitual",
+                temporada_id=gc.temporada_id
+            ))
+    else:
+        effective_coberturas = req.coberturas
+
+    # Group effective coverages by (turno, puesto)
+    coverage_demands = {}
+    for item in effective_coberturas:
+        key = (item.turno, item.puesto)
+        coverage_demands[key] = max(coverage_demands.get(key, 0), item.cantidad)
+
+    # Load existing shifts on this date
+    existing_shifts = session.exec(select(HorarioTrabajador).where(HorarioTrabajador.fecha == req.fecha)).all()
+    employees_map = {e.id: e for e in session.exec(select(Empleado)).all()}
+
+    # Group existing shifts by (turno, puesto)
+    grouped_shifts = {}
+    for s in existing_shifts:
+        if s.turno in ["Vacaciones", "Libre Disposición", "Baja", "Permiso", "Libre"]:
+            continue
+            
+        clean_turno = s.turno.replace(" (Cobertura)", "").strip()
+        puesto = "Sala"
+        if s.empleado_id and s.empleado_id in employees_map:
+            puesto = employees_map[s.empleado_id].puesto
+        elif s.notas:
+            for p in ["Sala", "Barra", "Cocinero", "Encargado", "Limpieza"]:
+                if p.lower() in s.notas.lower():
+                    puesto = p
+                    break
+                    
+        key = (clean_turno, puesto)
+        if key not in grouped_shifts:
+            grouped_shifts[key] = []
+        grouped_shifts[key].append(s)
+
+    # Sync
+    # We query all TurnoConfigs to get start/end times if needed
+    turno_configs = {tc.nombre: tc for tc in session.exec(select(TurnoConfig)).all()}
+
+    # Check each coverage demand key
+    all_keys = set(coverage_demands.keys()) | set(grouped_shifts.keys())
+
+    for key in all_keys:
+        turno, puesto = key
+        target_qty = coverage_demands.get(key, 0)
+        shifts_list = grouped_shifts.get(key, [])
+        existing_count = len(shifts_list)
+
+        if existing_count < target_qty:
+            # Need to create new unassigned shifts
+            tc = turno_configs.get(turno)
+            if tc:
+                start_time = tc.hora_inicio
+                end_time = tc.hora_fin
+            else:
+                if "mañana" in turno.lower():
+                    start_time, end_time = "09:00", "16:00"
+                elif "tarde" in turno.lower():
+                    start_time, end_time = "16:00", "00:00"
+                else:
+                    start_time, end_time = "19:00", "02:30"
+
+            for _ in range(target_qty - existing_count):
+                new_shift = HorarioTrabajador(
+                    empleado_id="",
+                    fecha=req.fecha,
+                    turno=turno,
+                    hora_inicio=start_time,
+                    hora_fin=end_time,
+                    notas=f"Generado: {puesto} (Refuerzo especial)"
+                )
+                session.add(new_shift)
+
+        elif existing_count > target_qty:
+            # Need to delete extra unassigned shifts
+            unassigned = [s for s in shifts_list if not s.empleado_id or s.empleado_id == ""]
+            to_delete_count = existing_count - target_qty
+            deleted = 0
+            for s in unassigned:
+                if deleted >= to_delete_count:
+                    break
+                session.delete(s)
+                deleted += 1
+
+    session.commit()
+    return {"status": "success", "message": f"Coberturas actualizadas y turnos sincronizados para el día {req.fecha}"}
 
 
 # === FESTIVOS ===

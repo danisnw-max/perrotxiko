@@ -932,6 +932,9 @@ export default function App() {
             setIsPrePayrollModalOpen={setIsPrePayrollModalOpen}
             showToast={showToast}
             loadSchedules={loadSchedules}
+            coberturas={coberturas}
+            loadConfig={loadConfig}
+            turnos={turnos}
           />
         )}
 

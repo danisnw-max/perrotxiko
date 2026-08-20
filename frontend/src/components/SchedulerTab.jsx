@@ -37,10 +37,20 @@ const SchedulerTab = ({
   setIsPrePayrollModalOpen,
   showToast,
   loadSchedules,
+  coberturas,
+  loadConfig,
+  turnos,
 }) => {
   const [monthlyFilter, setMonthlyFilter] = React.useState('trabajando'); // 'trabajando' or 'ausencias'
   const [isSwapRequestsModalOpen, setIsSwapRequestsModalOpen] = React.useState(false);
   const [swapRequests, setSwapRequests] = React.useState([]);
+
+  const [isDemandModalOpen, setIsDemandModalOpen] = React.useState(false);
+  const [selectedDemandDate, setSelectedDemandDate] = React.useState('');
+  const [demandForm, setDemandForm] = React.useState({
+    useTemplate: true,
+    coberturas: {}
+  });
 
   const fetchSwapRequests = async () => {
     try {
@@ -61,6 +71,86 @@ const SchedulerTab = ({
       loadSchedules();
     } catch (e) {
       showToast("Error al procesar la solicitud", "error");
+    }
+  };
+
+  const getBackendWeekday = (dateStr) => {
+    const d = new Date(dateStr);
+    const day = d.getDay();
+    return day === 0 ? 6 : day - 1;
+  };
+
+  const openDemandModal = (dateStr) => {
+    setSelectedDemandDate(dateStr);
+    const dateCobs = (coberturas || []).filter(c => c.fecha === dateStr);
+    const roles = ['Sala', 'Barra', 'Cocinero', 'Encargado', 'Limpieza'];
+    const turns = turnos.length > 0 ? turnos.map(t => t.nombre) : ['Mañana', 'Tarde', 'Noche'];
+    
+    let initialCoberturas = {};
+    turns.forEach(t => {
+      initialCoberturas[t] = {};
+      roles.forEach(r => {
+        initialCoberturas[t][r] = 0;
+      });
+    });
+
+    let useTemplate = true;
+
+    if (dateCobs.length > 0) {
+      useTemplate = false;
+      dateCobs.forEach(c => {
+        if (initialCoberturas[c.turno]) {
+          initialCoberturas[c.turno][c.puesto] = c.cantidad;
+        }
+      });
+    } else {
+      const weekday = getBackendWeekday(dateStr);
+      const weekdayCobs = (coberturas || []).filter(c => c.dia_semana === weekday && (!c.fecha || c.fecha === ''));
+      weekdayCobs.forEach(c => {
+        if (initialCoberturas[c.turno]) {
+          initialCoberturas[c.turno][c.puesto] = c.cantidad;
+        }
+      });
+    }
+
+    setDemandForm({
+      useTemplate,
+      coberturas: initialCoberturas
+    });
+    setIsDemandModalOpen(true);
+  };
+
+  const handleSaveDemand = async () => {
+    try {
+      let payload = {
+        fecha: selectedDemandDate,
+        coberturas: []
+      };
+
+      if (!demandForm.useTemplate) {
+        Object.entries(demandForm.coberturas).forEach(([turno, rolesObj]) => {
+          Object.entries(rolesObj).forEach(([puesto, cantidad]) => {
+            if (cantidad > 0) {
+              payload.coberturas.push({
+                turno,
+                puesto,
+                cantidad: parseInt(cantidad) || 0,
+                descripcion: "Refuerzo especial",
+                temporada_id: null
+              });
+            }
+          });
+        });
+      }
+
+      await api.post('/configuracion/coberturas/dia', payload);
+      showToast("Demanda del día actualizada correctamente", "success");
+      setIsDemandModalOpen(false);
+      
+      if (loadConfig) await loadConfig();
+      if (loadSchedules) await loadSchedules();
+    } catch (e) {
+      showToast("Error al guardar la demanda", "error");
     }
   };
 
@@ -284,7 +374,20 @@ const SchedulerTab = ({
                           <span>{day.name}</span>
                           {dayFestivo && <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0" title={dayFestivo.descripcion}></span>}
                         </h5>
-                        <p className="font-black text-indigo-400 font-mono text-[9px] mt-0.5">{day.dateFormatted}</p>
+                        <div className="flex justify-between items-center mt-1">
+                          <p className="font-black text-indigo-400 font-mono text-[9px]">{day.dateFormatted}</p>
+                          <button
+                            onClick={() => openDemandModal(day.dateStr)}
+                            className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border transition-all cursor-pointer ${
+                              (coberturas || []).some(c => c.fecha === day.dateStr)
+                                ? 'bg-amber-950/40 border-amber-850/40 text-amber-400 hover:bg-amber-900/30'
+                                : 'bg-slate-950/40 border-slate-850 text-slate-500 hover:text-slate-300 hover:bg-slate-900/30'
+                            }`}
+                            title="Personalizar plantilla de personal para este día"
+                          >
+                            {(coberturas || []).some(c => c.fecha === day.dateStr) ? '🎯 Especial' : '🎯 Demanda'}
+                          </button>
+                        </div>
                         
                         <div className="mt-2 text-[8px] font-bold uppercase tracking-widest p-1.5 rounded-lg text-center bg-slate-950/40 text-slate-400">
                           {sh && sh.abierto ? (
@@ -473,9 +576,24 @@ const SchedulerTab = ({
                           day.isCurrentMonth ? 'bg-slate-900/60 border-slate-800/80' : 'bg-slate-950/30 border-slate-900/40 opacity-40'
                         } ${dayFestivo ? 'border-rose-900/40 bg-rose-950/5' : ''}`}
                       >
-                        <div className="flex justify-between items-start mb-2">
+                        <div className="flex justify-between items-center mb-2">
                           <span className={`font-black text-xs ${day.isCurrentMonth ? (dayFestivo ? 'text-rose-400' : 'text-slate-300') : 'text-slate-500'}`}>{day.dateFormatted}</span>
-                          {dayFestivo && <span className="w-2 h-2 rounded-full bg-rose-500 shadow-sm" title={dayFestivo.descripcion}></span>}
+                          <div className="flex items-center gap-1.5">
+                            {day.isCurrentMonth && (
+                              <button 
+                                onClick={() => openDemandModal(day.dateStr)}
+                                className={`text-[9px] hover:text-slate-200 transition-colors cursor-pointer ${
+                                  (coberturas || []).some(c => c.fecha === day.dateStr)
+                                    ? 'text-amber-400 font-black'
+                                    : 'text-slate-600 opacity-40 hover:opacity-100'
+                                }`}
+                                title="Configurar personal necesario para este día"
+                              >
+                                🎯
+                              </button>
+                            )}
+                            {dayFestivo && <span className="w-2 h-2 rounded-full bg-rose-500 shadow-sm" title={dayFestivo.descripcion}></span>}
+                          </div>
                         </div>
                         
                         <div className="space-y-1.5 flex-1 text-left">
@@ -595,6 +713,146 @@ const SchedulerTab = ({
             >
               Cerrar
             </button>
+          </div>
+        </div>
+      )}
+      {isDemandModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-[32px] max-w-xl w-full flex flex-col text-left max-h-[90vh] shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black text-slate-100 tracking-tight flex items-center gap-2">
+                🎯 Personal Requerido: {selectedDemandDate}
+              </h3>
+              <button 
+                onClick={() => setIsDemandModalOpen(false)} 
+                className="p-2 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-6 flex-1 overflow-y-auto pr-1 mb-6">
+              {/* Type selector */}
+              <div className="flex gap-2 bg-slate-950/40 p-1.5 rounded-2xl border border-slate-850">
+                <button
+                  type="button"
+                  onClick={() => setDemandForm({ ...demandForm, useTemplate: true })}
+                  className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    demandForm.useTemplate ? 'bg-indigo-650 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Usar Plantilla Habitual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDemandForm({ ...demandForm, useTemplate: false })}
+                  className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    !demandForm.useTemplate ? 'bg-indigo-650 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Personalizar Demanda
+                </button>
+              </div>
+
+              {demandForm.useTemplate ? (
+                <div className="p-4 bg-slate-950/20 rounded-2xl border border-slate-800 space-y-3">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Vista previa de la plantilla habitual (informativo)
+                  </p>
+                  <div className="space-y-2">
+                    {Object.entries(demandForm.coberturas).map(([turno, rolesObj]) => {
+                      const activeRoles = Object.entries(rolesObj).filter(([_, qty]) => qty > 0);
+                      if (activeRoles.length === 0) return null;
+                      return (
+                        <div key={turno} className="flex justify-between items-center text-xs p-2 bg-slate-950/40 rounded-lg">
+                          <span className="font-extrabold text-slate-300">{turno}</span>
+                          <div className="flex gap-2 flex-wrap">
+                            {activeRoles.map(([role, qty]) => (
+                              <span key={role} className="bg-slate-900 px-2 py-0.5 rounded text-[10px] font-mono text-indigo-400 font-bold border border-slate-800">
+                                {role}: {qty}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(demandForm.coberturas).map(([turno, rolesObj]) => (
+                    <div key={turno} className="p-4 bg-slate-950/20 rounded-2xl border border-slate-800 space-y-3">
+                      <h4 className="font-black text-slate-200 text-[11px] uppercase tracking-widest border-b border-slate-850 pb-2">
+                        Turno: {turno}
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {Object.entries(rolesObj).map(([puesto, cantidad]) => (
+                          <div key={puesto} className="flex items-center justify-between bg-slate-950 border border-slate-800 p-2 rounded-xl">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">{puesto}</span>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const val = Math.max(0, cantidad - 1);
+                                  setDemandForm({
+                                    ...demandForm,
+                                    coberturas: {
+                                      ...demandForm.coberturas,
+                                      [turno]: {
+                                        ...demandForm.coberturas[turno],
+                                        [puesto]: val
+                                      }
+                                    }
+                                  });
+                                }}
+                                className="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold text-xs cursor-pointer border border-slate-700"
+                              >
+                                -
+                              </button>
+                              <span className="w-6 text-center font-mono font-black text-xs text-slate-100">{cantidad}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const val = cantidad + 1;
+                                  setDemandForm({
+                                    ...demandForm,
+                                    coberturas: {
+                                      ...demandForm.coberturas,
+                                      [turno]: {
+                                        ...demandForm.coberturas[turno],
+                                        [puesto]: val
+                                      }
+                                    }
+                                  });
+                                }}
+                                className="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center font-bold text-xs cursor-pointer border border-slate-700"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button 
+                onClick={handleSaveDemand}
+                className="flex-1 py-3.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-lg transition-all cursor-pointer"
+              >
+                Guardar Configuración
+              </button>
+              <button 
+                onClick={() => setIsDemandModalOpen(false)}
+                className="py-3.5 px-6 bg-slate-800 hover:bg-slate-750 text-slate-400 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border border-slate-700"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

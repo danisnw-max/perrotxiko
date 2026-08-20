@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Optional
+from pydantic import BaseModel
 from database import get_session
 from models import (
     HorarioBar,
@@ -201,6 +202,41 @@ def delete_cobertura(id: int, session: Session = Depends(get_session)):
     session.delete(db_cob)
     session.commit()
     return {"status": "success", "message": "Regla de cobertura eliminada"}
+
+class CoberturaDiaItem(BaseModel):
+    turno: str
+    puesto: str
+    cantidad: int
+    descripcion: Optional[str] = None
+    temporada_id: Optional[int] = None
+
+class CoberturaDiaBatchRequest(BaseModel):
+    fecha: str
+    coberturas: List[CoberturaDiaItem]
+
+@router.post("/api/configuracion/coberturas/dia")
+def save_coberturas_dia(req: CoberturaDiaBatchRequest, session: Session = Depends(get_session)):
+    # 1. Delete all existing coverages for this specific date
+    existing = session.exec(select(CoberturaRequerida).where(CoberturaRequerida.fecha == req.fecha)).all()
+    for cob in existing:
+        session.delete(cob)
+    
+    # 2. Add new coverages if quantity > 0
+    for item in req.coberturas:
+        if item.cantidad > 0:
+            db_cob = CoberturaRequerida(
+                fecha=req.fecha,
+                dia_semana=None, # specific date
+                turno=item.turno,
+                puesto=item.puesto,
+                cantidad=item.cantidad,
+                descripcion=item.descripcion or "",
+                temporada_id=item.temporada_id
+            )
+            session.add(db_cob)
+    
+    session.commit()
+    return {"status": "success", "message": f"Coberturas actualizadas para el día {req.fecha}"}
 
 
 # === FESTIVOS ===

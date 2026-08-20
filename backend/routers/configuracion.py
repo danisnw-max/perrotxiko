@@ -261,7 +261,6 @@ def save_coberturas_dia(req: CoberturaDiaBatchRequest, session: Session = Depend
             ))
     else:
         effective_coberturas = req.coberturas
-
     # Group effective coverages by (turno, puesto)
     coverage_demands = {}
     for item in effective_coberturas:
@@ -272,13 +271,12 @@ def save_coberturas_dia(req: CoberturaDiaBatchRequest, session: Session = Depend
     existing_shifts = session.exec(select(HorarioTrabajador).where(HorarioTrabajador.fecha == req.fecha)).all()
     employees_map = {e.id: e for e in session.exec(select(Empleado)).all()}
 
-    # Group existing shifts by (turno, puesto)
-    grouped_shifts = {}
+    # Resolve each existing shift's role and clean name
+    resolved_shifts = []
     for s in existing_shifts:
         if s.turno in ["Vacaciones", "Libre Disposición", "Baja", "Permiso", "Libre"]:
             continue
             
-        clean_turno = s.turno.replace(" (Cobertura)", "").strip()
         puesto = None
         if s.notas:
             for p in ["Sala", "Barra", "Cocinero", "Encargado", "Limpieza"]:
@@ -291,56 +289,79 @@ def save_coberturas_dia(req: CoberturaDiaBatchRequest, session: Session = Depend
                 puesto = employees_map[s.empleado_id].puesto
             else:
                 puesto = "Sala"
-                    
-        key = (clean_turno, puesto)
-        if key not in grouped_shifts:
-            grouped_shifts[key] = []
-        grouped_shifts[key].append(s)
+                
+        resolved_shifts.append({
+            "shift": s,
+            "puesto": puesto,
+            "hora_inicio": s.hora_inicio,
+            "hora_fin": s.hora_fin,
+            "clean_turno": s.turno.replace(" (Cobertura)", "").strip()
+        })
+
+    def get_time_overlap_minutes(start1: str, end1: str, start2: str, end2: str) -> int:
+        def to_mins(t):
+            parts = t.split(":")
+            return int(parts[0]) * 60 + int(parts[1])
+        try:
+            s1, e1 = to_mins(start1), to_mins(end1)
+            if e1 < s1: e1 += 1440
+            s2, e2 = to_mins(start2), to_mins(end2)
+            if e2 < s2: e2 += 1440
+            overlap_start = max(s1, s2)
+            overlap_end = min(e1, e2)
+            if overlap_start < overlap_end:
+                return overlap_end - overlap_start
+        except Exception:
+            pass
+        return 0
 
     # Sync
-    # We query all TurnoConfigs to get start/end times if needed
     turno_configs = {tc.nombre: tc for tc in session.exec(select(TurnoConfig)).all()}
 
-    # Check each coverage demand key
-    all_keys = set(coverage_demands.keys()) | set(grouped_shifts.keys())
-
-    for key in all_keys:
+    # We iterate over all requested coverages to ensure we meet them
+    for key, target_qty in coverage_demands.items():
         turno, puesto = key
-        target_qty = coverage_demands.get(key, 0)
-        shifts_list = grouped_shifts.get(key, [])
-        existing_count = len(shifts_list)
+        
+        # Get target times for this turno name
+        tc = turno_configs.get(turno)
+        if tc:
+            t_start, t_end = tc.hora_inicio, tc.hora_fin
+        else:
+            if "mañana" in turno.lower():
+                t_start, t_end = "09:00", "16:00"
+            elif "tarde" in turno.lower():
+                t_start, t_end = "16:00", "00:00"
+            else:
+                t_start, t_end = "19:00", "02:30"
+                
+        # Find existing shifts that cover this (matching role AND either clean name match OR overlap >= 90 mins)
+        matching_shifts = [
+            rs for rs in resolved_shifts 
+            if rs["puesto"] == puesto 
+            and (rs["clean_turno"] == turno or get_time_overlap_minutes(rs["hora_inicio"], rs["hora_fin"], t_start, t_end) >= 90)
+        ]
+        
+        existing_count = len(matching_shifts)
 
         if existing_count < target_qty:
-            # Need to create new unassigned shifts
-            tc = turno_configs.get(turno)
-            if tc:
-                start_time = tc.hora_inicio
-                end_time = tc.hora_fin
-            else:
-                if "mañana" in turno.lower():
-                    start_time, end_time = "09:00", "16:00"
-                elif "tarde" in turno.lower():
-                    start_time, end_time = "16:00", "00:00"
-                else:
-                    start_time, end_time = "19:00", "02:30"
-
+            # Need to create missing unassigned shifts
             for _ in range(target_qty - existing_count):
                 new_shift = HorarioTrabajador(
                     empleado_id="",
                     fecha=req.fecha,
                     turno=turno,
-                    hora_inicio=start_time,
-                    hora_fin=end_time,
+                    hora_inicio=t_start,
+                    hora_fin=t_end,
                     notas=f"Generado: {puesto} (Refuerzo especial)"
                 )
                 session.add(new_shift)
 
         elif existing_count > target_qty:
             # Need to delete extra unassigned shifts
-            unassigned = [s for s in shifts_list if not s.empleado_id or s.empleado_id == ""]
+            unassigned_matching = [rs["shift"] for rs in matching_shifts if not rs["shift"].empleado_id or rs["shift"].empleado_id == ""]
             to_delete_count = existing_count - target_qty
             deleted = 0
-            for s in unassigned:
+            for s in unassigned_matching:
                 if deleted >= to_delete_count:
                     break
                 session.delete(s)
